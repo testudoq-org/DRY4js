@@ -6,6 +6,7 @@
  */
 
 import { Command } from 'commander';
+import ora from 'ora';
 import { scanFiles } from './scanner.mjs';
 import { parseFile } from './parser.mjs';
 import { normalise } from './normaliser.mjs';
@@ -35,13 +36,17 @@ program
     const minLines = opts.minLines;
     const minNodes = opts.minNodes;
 
+    const spinner = ora({ text: 'Scanning files…', isSilent: format === 'json' }).start();
+
     // 1. Discover files
     const files = await scanFiles(paths);
 
     if (files.length === 0) {
-      console.warn('[dryjs] No source files found.');
+      spinner.warn('No source files found.');
       process.exit(0);
     }
+
+    spinner.text = `Parsing ${files.length} file(s)…`;
 
     // 2. Parse + normalise + fingerprint each top-level form
     const entries = [];
@@ -70,8 +75,12 @@ program
       }
     }
 
+    spinner.text = `Comparing ${entries.length} candidate form(s)…`;
+
     // 3. Compare
     const pairs = findDuplicates(entries, { threshold });
+
+    spinner.succeed(`Done — ${pairs.length} duplicate pair(s) found.`);
 
     // 4. Report
     report(pairs, format);
