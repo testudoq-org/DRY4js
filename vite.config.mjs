@@ -5,5 +5,11 @@ export default defineConfig({
     environment: 'node',
     include: ['test/**/*.test.mjs'],
     globals: false,
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.mjs'],
+      exclude: ['src/cli.mjs', 'src/utils.mjs'],
+      reporter: ['text', 'lcov'],
+    },
   },
 });
