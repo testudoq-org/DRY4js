@@ -132,7 +132,7 @@ Commit: "feat: complete CLI orchestration"
 Markdown
 
 ```
-You are working on the dryjs project.
+r.You are working on the dryjs project.
 
 Switch to **new branch** `feature/final-tests-polish`.
 
@@ -141,5 +141,80 @@ Switch to **new branch** `feature/final-tests-polish`.
 - Polish README.md with usage examples
 - Final fixes
 
-Commit when everything passes, then provide instructions to merge to maste
+Commit when everything passes, then provide instructions to merge to master
+
+
+Prompt 7 – CRAP Analysis, Test Coverage Improvement & Guardrail Review
+MarkdownYou are working on the dryjs project.
+
+Read `.github/copilot-instructions.md`, `ARCHITECTURE.md`, `PROMPT-ADDENDUM.md`, and `DEVELOPMENT-WORKFLOW.md` first.
+
+**Switch to a new branch** called `feature/crap-analysis-coverage`.
+
+### Task 1: Install CRAP Tool
+Install the latest version of `crap4js` (currently 1.0.1-beta.3) as a **dev dependency**:
+
+```bash
+npm install --save-dev crap4js@1.0.1-beta.3
+Update package.json scripts to include:
+JSON"test:crap": "crap4js --src src --coverage ./coverage",
+"report": "npm run test:coverage && npm run test:crap"
+Task 2: Run Full Test Suite + CRAP Report
+
+Run the full test suite with coverage: npm run test:coverage
+Then run the CRAP report
+Analyze the CRAP report output
+
+Task 3: Identify & Improve Weak Areas
+Determine areas with:
+
+High CRAP scores (risky code)
+Low test coverage
+High cyclomatic complexity
+
+Prioritize improvements in this order:
+
+src/normaliser.mjs (most critical module)
+src/parser.mjs
+src/fingerprinter.mjs
+src/comparator.mjs
+src/cli.mjs
+
+Add missing tests (unit + integration) to bring coverage higher and reduce CRAP scores.
+Task 4: Review All Prompt/Guardrail Files
+Review these files and suggest concrete improvements:
+
+.github/copilot-instructions.md
+ARCHITECTURE.md
+PROMPT-ADDENDUM.md
+DEVELOPMENT-WORKFLOW.md
+
+Look for:
+
+Outdated instructions
+Missing constraints
+Opportunities for clarity
+New best practices we should add now that the project is built
+
+Final Deliverables
+After improvements:
+
+Commit all changes with clear messages
+Provide a summary report containing:
+Before/After CRAP scores for key files
+Test coverage percentage
+List of new tests added
+Recommended updates to guardrail files (with full proposed new content)
+
+
+Only commit when tests pass and CRAP scores have improved.
+text---
+
+### Recommended Usage
+
+1. **Create the branch** manually first (recommended on Windows):
+   ```powershell
+   git checkout master
+   git pull
+   git checkout -b feature/crap-analysis-coverage
 ```
