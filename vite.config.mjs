@@ -8,7 +8,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**/*.mjs'],
-      exclude: ['src/cli.mjs', 'src/utils.mjs'],
+      exclude: ['src/bin.mjs'],
       reporter: ['text', 'lcov'],
     },
   },

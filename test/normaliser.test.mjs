@@ -9,7 +9,20 @@ import { normalise, serialise } from '../src/normaliser.mjs';
 function parseFirst(src) {
   const ast = parse(src, {
     sourceType: 'module',
-    plugins: ['jsx', 'typescript', 'decorators-legacy', 'classProperties'],
+    plugins: [
+      'jsx',
+      'typescript',
+      'decorators-legacy',
+      'classProperties',
+      'classPrivateProperties',
+      'classPrivateMethods',
+      'dynamicImport',
+      'optionalChaining',
+      'nullishCoalescingOperator',
+      'logicalAssignment',
+      'numericSeparator',
+      'objectRestSpread',
+    ],
   });
   return ast.program.body[0];
 }
@@ -241,6 +254,86 @@ describe('normalise – edge cases', () => {
     const norm = normFirst('const obj = { a: 1, b: 2 };');
     const decl = norm.children[0];
     expect(decl.children[1].type).toBe('ObjectExpression');
+  });
+
+  it('handles switch statements with explicit and default cases', () => {
+    const norm = normFirst('switch (x) { case 1: foo(); break; default: bar(); }');
+    expect(norm.type).toBe('SwitchStatement');
+    expect(norm.children[1].type).toBe('SwitchCase');
+    expect(norm.children[2].type).toBe('SwitchCase');
+    expect(norm.children[2].children[0].type).toBe('ExpressionStatement');
+  });
+
+  it('handles do-while, for-in, and for-of loops', () => {
+    expect(normFirst('do { tick(); } while (ready);').type).toBe('DoWhileStatement');
+    expect(normFirst('for (const key in obj) { use(key); }').type).toBe('ForInStatement');
+    expect(normFirst('for (const value of list) { use(value); }').type).toBe('ForOfStatement');
+  });
+
+  it('handles labeled statements, breaks, continues, and throws', () => {
+    const labeled = normFirst('outer: while (running) { if (stop) break; continue outer; }');
+    expect(labeled.type).toBe('LabeledStatement');
+
+    const thrown = normFirst('throw new Error("boom");');
+    expect(thrown.type).toBe('ThrowStatement');
+  });
+
+  it('handles destructuring, default params, and rest params', () => {
+    const norm = normFirst('function f({ a }, [x], y = 1, ...rest) { return rest; }');
+    expect(norm.children[0].type).toBe('ObjectPattern');
+    expect(norm.children[1].type).toBe('ArrayPattern');
+    expect(norm.children[2].type).toBe('AssignmentPattern');
+    expect(norm.children[3].type).toBe('RestElement');
+  });
+
+  it('handles export forms without inline declarations', () => {
+    const named = normFirst("export { default as foo } from './dep.js';");
+    expect(named.type).toBe('ExportNamedDeclaration');
+    expect(named.children).toEqual([]);
+
+    const all = normFirst("export * from './dep.js';");
+    expect(all.type).toBe('ExportAllDeclaration');
+  });
+
+  it('handles TypeScript declaration forms', () => {
+    expect(normFirst('interface Foo { bar: string }').type).toBe('TSInterfaceDeclaration');
+    expect(normFirst('type Foo = string;').type).toBe('TSTypeAliasDeclaration');
+    expect(normFirst('enum Color { Red }').type).toBe('TSEnumDeclaration');
+  });
+
+  it('handles private class fields and private methods', () => {
+    const norm = normFirst('class Foo { #value = 1; #get() { return this.#value; } }');
+    const body = norm.children[norm.children.length - 1];
+    expect(body.type).toBe('ClassBody');
+    expect(body.children.some((child) => child.type === 'ClassPrivateProperty')).toBe(true);
+    expect(body.children.some((child) => child.type === 'ClassPrivateMethod')).toBe(true);
+  });
+
+  it('handles optional chaining, tagged templates, await, yield, and sequences', () => {
+    const optional = normFirst('const result = obj?.prop?.(tag`x`);');
+    const optionalDecl = optional.children[0];
+    expect(optionalDecl.children[1].type).toBe('OptionalCallExpression');
+
+    const awaited = normFirst('async function f(x) { return await x; }');
+    const awaitedBlock = awaited.children[awaited.children.length - 1];
+    expect(awaitedBlock.children[0].children[0].type).toBe('AwaitExpression');
+
+    const yielded = normFirst('function* g(x) { yield x; }');
+    const yieldedBlock = yielded.children[yielded.children.length - 1];
+    expect(yieldedBlock.children[0].children[0].type).toBe('YieldExpression');
+
+    const sequenced = normFirst('const value = (a(), b(), c());');
+    const sequenceDecl = sequenced.children[0];
+    expect(sequenceDecl.children[1].type).toBe('SequenceExpression');
+  });
+
+  it('handles JSX fragments, expression containers, and spread children', () => {
+    const norm = normFirst('const el = <><span>{value}</span>{...items}</>;');
+    const decl = norm.children[0];
+    const fragment = decl.children[1];
+    expect(fragment.type).toBe('JSXFragment');
+    expect(fragment.children.some((child) => child.type === 'JSXElement')).toBe(true);
+    expect(fragment.children.some((child) => child.type === 'JSXSpreadChild')).toBe(true);
   });
 });
 

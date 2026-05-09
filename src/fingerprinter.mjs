@@ -7,19 +7,11 @@
  */
 
 import { serialise } from './normaliser.mjs';
+export { countNodes } from './utils.mjs';
+import { countNodes } from './utils.mjs';
 
 /** Minimum number of nodes in a sub-tree to include as a fingerprint */
 export const MIN_NODES = 3;
-
-/**
- * Count the total number of nodes in a NormNode tree.
- *
- * @param {import('./normaliser.mjs').NormNode} node
- * @returns {number}
- */
-export function countNodes(node) {
-  return 1 + node.children.reduce((sum, c) => sum + countNodes(c), 0);
-}
 
 /**
  * Produce a Set of fingerprint strings for the given NormNode.
