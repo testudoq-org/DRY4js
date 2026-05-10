@@ -5,7 +5,7 @@
  */
 
 import { parse } from '@babel/parser';
-import fs from 'fs';
+import fs from 'node:fs';
 
 /** Babel parser plugins to enable broad language support */
 const BABEL_PLUGINS = [
@@ -35,7 +35,7 @@ export function parseFile(filePath) {
   try {
     source = fs.readFileSync(filePath, 'utf8');
   } catch (err) {
-    console.warn(`[dryjs] Warning: cannot read ${filePath}: ${err.message}`);
+    globalThis.console.warn(`[dryjs] Warning: cannot read ${filePath}: ${err.message}`);
     return [];
   }
 
@@ -48,7 +48,7 @@ export function parseFile(filePath) {
       plugins: BABEL_PLUGINS,
     });
   } catch (err) {
-    console.warn(`[dryjs] Warning: cannot parse ${filePath}: ${err.message}`);
+    globalThis.console.warn(`[dryjs] Warning: cannot parse ${filePath}: ${err.message}`);
     return [];
   }
 

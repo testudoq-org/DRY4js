@@ -87,7 +87,7 @@ export function buildProgram({ spinnerFactory = (options) => ora(options), repor
   return { program, getResult: () => result };
 }
 
-export async function runCli(argv = process.argv, deps = {}) {
+export async function runCli(argv = globalThis.process.argv, deps = {}) {
   const { program, getResult } = buildProgram(deps);
   await program.parseAsync(argv);
   return getResult();

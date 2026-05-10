@@ -1,0 +1,19 @@
+---
+exclude_paths:
+  - "node_modules/**"
+  - "node_modules/**/*"
+  - "coverage/**"
+  - "coverage/**/*"
+engines:
+  pmd-7:
+    exclude_paths:
+      - "node_modules/**"
+      - "node_modules/**/*"
+      - "coverage/**"
+      - "coverage/**/*"
+  eslint-9:
+    exclude_paths:
+      - "node_modules/**"
+      - "node_modules/**/*"
+      - "coverage/**"
+      - "coverage/**/*"

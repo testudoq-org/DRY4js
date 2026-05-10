@@ -2,7 +2,9 @@
 
 import { runCli } from './cli.mjs';
 
-runCli().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+try {
+  await runCli();
+} catch (error) {
+  globalThis.console.error(error);
+  globalThis.process.exitCode = 1;
+}
