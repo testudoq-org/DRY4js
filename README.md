@@ -57,15 +57,15 @@ node src/cli.mjs [options] [paths...]
 
 ### Options
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `-t, --threshold <n>` | Minimum similarity score | `0.82` |
-| `--min-lines <n>` | Minimum source lines per candidate form | `4` |
-| `--min-nodes <n>` | Minimum normalised node count | `20` |
-| `-f, --format <fmt>` | Output format: `text` or `json` | `text` |
-| `--json` | Shorthand for `--format json` | |
-| `-V, --version` | Show version | |
-| `-h, --help` | Show help | |
+| Flag                    | Description                             | Default  |
+| ----------------------- | --------------------------------------- | -------- |
+| `-t, --threshold <n>` | Minimum similarity score                | `0.82` |
+| `--min-lines <n>`     | Minimum source lines per candidate form | `4`    |
+| `--min-nodes <n>`     | Minimum normalised node count           | `20`   |
+| `-f, --format <fmt>`  | Output format:`text` or `json`      | `text` |
+| `--json`              | Shorthand for `--format json`         |          |
+| `-V, --version`       | Show version                            |          |
+| `-h, --help`          | Show help                               |          |
 
 ### Examples
 
@@ -143,6 +143,7 @@ npm run test:coverage # tests + coverage report
 ## Testing
 
 107 tests across 6 test files covering:
+
 - Scanner file discovery
 - Parser form extraction and error resilience
 - Normaliser determinism and structural invariants
@@ -153,4 +154,4 @@ npm run test:coverage # tests + coverage report
 
 ## License
 
-MIT
+CC-BY-NC-4.0
