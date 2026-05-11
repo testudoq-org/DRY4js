@@ -1,11 +1,4 @@
-/**
- * cli.test.mjs
- * Integration tests for the full dryjs pipeline.
- * Tests are done by exercising each module in the same order the CLI does,
- * without spawning a child process (faster + more reliable in CI).
- */
-
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -16,10 +9,7 @@ import { normalise } from '../src/normaliser.mjs';
 import { fingerprint, countNodes } from '../src/fingerprinter.mjs';
 import { findDuplicates } from '../src/comparator.mjs';
 import { formatText, formatJson } from '../src/reporter.mjs';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+import { DEFAULT_MIN_LINES, DEFAULT_MIN_NODES, DEFAULT_THRESHOLD, runCli } from '../src/cli.mjs';
 
 let tmpDir;
 
@@ -30,6 +20,25 @@ function writeTmp(relPath, content) {
   return full;
 }
 
+function createSpinner() {
+  return {
+    text: '',
+    warnings: [],
+    successes: [],
+    start() {
+      return this;
+    },
+    warn(message) {
+      this.warnings.push(message);
+      return this;
+    },
+    succeed(message) {
+      this.successes.push(message);
+      return this;
+    },
+  };
+}
+
 beforeAll(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dryjs-cli-test-'));
 });
@@ -38,13 +47,7 @@ afterAll(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-/**
- * Run the full pipeline on a set of already-written files.
- * @param {string[]} filePaths - Absolute paths to scan
- * @param {object} [opts]
- * @returns {{ entries: object[], pairs: object[] }}
- */
-async function runPipeline(filePaths, { threshold = 0.82, minLines = 4, minNodes = 20 } = {}) {
+function runPipeline(filePaths, { threshold = 0.82, minLines = 4, minNodes = 20 } = {}) {
   const entries = [];
 
   for (const file of filePaths) {
@@ -52,52 +55,51 @@ async function runPipeline(filePaths, { threshold = 0.82, minLines = 4, minNodes
     for (const form of forms) {
       if (form.lineCount < minLines) continue;
       const normNode = normalise(form.node);
-      const nc = countNodes(normNode);
-      if (nc < minNodes) continue;
+      const nodeTotal = countNodes(normNode);
+      if (nodeTotal < minNodes) continue;
       entries.push({
         file: form.file,
         startLine: form.startLine,
         endLine: form.endLine,
         lineCount: form.lineCount,
-        nodeCount: nc,
+        nodeCount: nodeTotal,
         fingerprints: fingerprint(normNode),
       });
     }
   }
 
-  const pairs = findDuplicates(entries, { threshold });
-  return { entries, pairs };
+  return {
+    entries,
+    pairs: findDuplicates(entries, { threshold }),
+  };
 }
 
-// ---------------------------------------------------------------------------
-// Full pipeline – identical structure, different names
-// ---------------------------------------------------------------------------
+describe('full pipeline identical structure detection', () => {
+  it('finds a score of 1 for renamed identical functions', () => {
+    const fileA = writeTmp('pipeline/alpha.js', [
+      'function processAlpha(items) {',
+      '  const filtered = items.filter(isValid);',
+      '  const sorted = filtered.sort(byDate);',
+      '  const mapped = sorted.map(transform);',
+      '  return { count: mapped.length, data: mapped };',
+      '}',
+    ].join('\n'));
 
-describe('full pipeline – identical structure detection', () => {
-  it('finds a score of 1.0 for renamed-but-identical functions', async () => {
-    const fileA = writeTmp('pipeline/alpha.js', `
-function processAlpha(items) {
-  const filtered = items.filter(isValid);
-  const sorted = filtered.sort(byDate);
-  const mapped = sorted.map(transform);
-  return { count: mapped.length, data: mapped };
-}
-`);
-    const fileB = writeTmp('pipeline/beta.js', `
-function processBeta(rows) {
-  const filtered = rows.filter(isValid);
-  const sorted = filtered.sort(byDate);
-  const mapped = sorted.map(transform);
-  return { count: mapped.length, data: mapped };
-}
-`);
+    const fileB = writeTmp('pipeline/beta.js', [
+      'function processBeta(rows) {',
+      '  const filtered = rows.filter(isValid);',
+      '  const sorted = filtered.sort(byDate);',
+      '  const mapped = sorted.map(transform);',
+      '  return { count: mapped.length, data: mapped };',
+      '}',
+    ].join('\n'));
 
-    const { pairs } = await runPipeline([fileA, fileB], { threshold: 0.9, minLines: 4, minNodes: 10 });
+    const { pairs } = runPipeline([fileA, fileB], { threshold: 0.9, minLines: 4, minNodes: 10 });
     expect(pairs.length).toBeGreaterThan(0);
-    expect(pairs[0].score).toBeCloseTo(1.0);
+    expect(pairs[0].score).toBeCloseTo(1);
   });
 
-  it('reports correct file and line metadata in pairs', async () => {
+  it('reports correct file and line metadata', () => {
     const fileA = writeTmp('meta/a.js', [
       '// preamble',
       'function doWork(x, y) {',
@@ -105,6 +107,7 @@ function processBeta(rows) {
       '  return result * 2;',
       '}',
     ].join('\n'));
+
     const fileB = writeTmp('meta/b.js', [
       'function doTask(a, b) {',
       '  const result = a + b;',
@@ -112,7 +115,7 @@ function processBeta(rows) {
       '}',
     ].join('\n'));
 
-    const { pairs } = await runPipeline([fileA, fileB], { threshold: 0.5, minLines: 3, minNodes: 5 });
+    const { pairs } = runPipeline([fileA, fileB], { threshold: 0.5, minLines: 3, minNodes: 5 });
     expect(pairs.length).toBeGreaterThan(0);
 
     const pair = pairs[0];
@@ -123,125 +126,185 @@ function processBeta(rows) {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Full pipeline – dissimilar code is not flagged
-// ---------------------------------------------------------------------------
+describe('full pipeline dissimilar code not flagged', () => {
+  it('does not flag structurally different functions', () => {
+    const fileA = writeTmp('dissimilar/a.js', [
+      'function simple(x) {',
+      '  return x * 2;',
+      '}',
+    ].join('\n'));
 
-describe('full pipeline – dissimilar code not flagged', () => {
-  it('does not flag structurally different functions', async () => {
-    const fileA = writeTmp('dissimilar/a.js', `
-function simple(x) {
-  return x * 2;
-}
-`);
-    const fileB = writeTmp('dissimilar/b.js', `
-function complex(a, b, c, d) {
-  const temp = a + b;
-  if (temp > c) {
-    return temp * d + a - b;
-  }
-  return d * (a + b + c);
-}
-`);
+    const fileB = writeTmp('dissimilar/b.js', [
+      'function complex(a, b, c, d) {',
+      '  const temp = a + b;',
+      '  if (temp > c) {',
+      '    return temp * d + a - b;',
+      '  }',
+      '  return d * (a + b + c);',
+      '}',
+    ].join('\n'));
 
-    const { pairs } = await runPipeline([fileA, fileB], { threshold: 0.82, minLines: 3, minNodes: 5 });
-    // The two functions have completely different structure → should not match
+    const { pairs } = runPipeline([fileA, fileB], { threshold: 0.82, minLines: 3, minNodes: 5 });
     expect(pairs.length).toBe(0);
   });
 });
 
-// ---------------------------------------------------------------------------
-// Full pipeline – minLines / minNodes filters
-// ---------------------------------------------------------------------------
-
-describe('full pipeline – filters', () => {
-  it('excludes forms below minLines', async () => {
-    // A one-liner won't pass minLines=4
+describe('full pipeline filters', () => {
+  it('excludes forms below minLines', () => {
     const file = writeTmp('filters/tiny.js', 'const x = () => 42;\n');
-    const { entries } = await runPipeline([file], { minLines: 4, minNodes: 1 });
+    const { entries } = runPipeline([file], { minLines: 4, minNodes: 1 });
     expect(entries.length).toBe(0);
   });
 
-  it('excludes forms below minNodes after normalisation', async () => {
+  it('excludes forms below minNodes', () => {
     const file = writeTmp('filters/small.js', [
       'function tiny(x) {',
       '  return x;',
       '}',
-      '',
     ].join('\n'));
-    const { entries } = await runPipeline([file], { minLines: 1, minNodes: 100 });
+
+    const { entries } = runPipeline([file], { minLines: 1, minNodes: 100 });
     expect(entries.length).toBe(0);
   });
 });
 
-// ---------------------------------------------------------------------------
-// Full pipeline – reporter integration
-// ---------------------------------------------------------------------------
+describe('full pipeline reporter integration', () => {
+  it('formatText contains DUPLICATE for matched pairs', () => {
+    const src = [
+      'function workA(xs) {',
+      '  const ys = xs.filter(pred);',
+      '  const zs = ys.map(fn);',
+      '  return zs.reduce(add, 0);',
+      '}',
+    ].join('\n');
 
-describe('full pipeline – reporter integration', () => {
-  it('formatText output contains DUPLICATE for matched pairs', async () => {
-    const src = `
-function workA(xs) {
-  const ys = xs.filter(pred);
-  const zs = ys.map(fn);
-  return zs.reduce(add, 0);
-}
-`;
     const fileA = writeTmp('reporter/a.js', src);
-    const fileB = writeTmp('reporter/b.js', src.replace('workA', 'workB').replace('xs', 'items').replace('ys', 'filtered').replace('zs', 'mapped'));
+    const fileB = writeTmp(
+      'reporter/b.js',
+      src.replace('workA', 'workB').replace('xs', 'items').replace('ys', 'filtered').replace('zs', 'mapped'),
+    );
 
-    const { pairs } = await runPipeline([fileA, fileB], { threshold: 0.5, minLines: 4, minNodes: 5 });
-
-    if (pairs.length > 0) {
-      const text = formatText(pairs);
-      expect(text).toContain('DUPLICATE');
-    }
+    const { pairs } = runPipeline([fileA, fileB], { threshold: 0.5, minLines: 4, minNodes: 5 });
+    expect(formatText(pairs)).toContain('DUPLICATE');
   });
 
-  it('formatJson returns parseable JSON with candidates array', async () => {
-    const fileA = writeTmp('reporter-json/a.js', `
-function taskOne(items) {
-  return items.filter(Boolean).map(String).join(', ');
-}
-`);
-    const fileB = writeTmp('reporter-json/b.js', `
-function taskTwo(rows) {
-  return rows.filter(Boolean).map(String).join(', ');
-}
-`);
+  it('formatJson returns parseable JSON', () => {
+    const fileA = writeTmp('reporter-json/a.js', [
+      'function taskOne(items) {',
+      "  return items.filter(Boolean).map(String).join(', ');",
+      '}',
+    ].join('\n'));
 
-    const { pairs } = await runPipeline([fileA, fileB], { threshold: 0.5, minLines: 3, minNodes: 5 });
+    const fileB = writeTmp('reporter-json/b.js', [
+      'function taskTwo(rows) {',
+      "  return rows.filter(Boolean).map(String).join(', ');",
+      '}',
+    ].join('\n'));
+
+    const { pairs } = runPipeline([fileA, fileB], { threshold: 0.5, minLines: 3, minNodes: 5 });
     const json = JSON.parse(formatJson(pairs));
-    expect(json).toHaveProperty('candidates');
     expect(Array.isArray(json.candidates)).toBe(true);
   });
 });
 
-// ---------------------------------------------------------------------------
-// Full pipeline – multi-file scan via scanFiles
-// ---------------------------------------------------------------------------
-
-describe('full pipeline – scanFiles integration', () => {
-  it('scanFiles + pipeline works end-to-end on a directory', async () => {
+describe('full pipeline scanFiles integration', () => {
+  it('scanFiles plus pipeline works end to end on a directory', async () => {
     const dir = path.join(tmpDir, 'scan-dir');
-    writeTmp('scan-dir/one.js', `
-function calcSum(numbers) {
-  const result = numbers.reduce((acc, n) => acc + n, 0);
-  return result;
-}
-`);
-    writeTmp('scan-dir/two.js', `
-function calcTotal(values) {
-  const result = values.reduce((acc, v) => acc + v, 0);
-  return result;
-}
-`);
+
+    writeTmp('scan-dir/one.js', [
+      'function calcSum(numbers) {',
+      '  const result = numbers.reduce((acc, n) => acc + n, 0);',
+      '  return result;',
+      '}',
+    ].join('\n'));
+
+    writeTmp('scan-dir/two.js', [
+      'function calcTotal(values) {',
+      '  const result = values.reduce((acc, v) => acc + v, 0);',
+      '  return result;',
+      '}',
+    ].join('\n'));
 
     const files = await scanFiles([dir]);
     expect(files.length).toBe(2);
 
-    const { pairs } = await runPipeline(files, { threshold: 0.7, minLines: 3, minNodes: 5 });
+    const { pairs } = runPipeline(files, { threshold: 0.7, minLines: 3, minNodes: 5 });
     expect(pairs.length).toBeGreaterThan(0);
     expect(pairs[0].score).toBeGreaterThanOrEqual(0.7);
   });
 });
+
+describe('runCli', () => {
+  it('exports documented default values', () => {
+    expect(DEFAULT_THRESHOLD).toBe(0.82);
+    expect(DEFAULT_MIN_LINES).toBe(4);
+    expect(DEFAULT_MIN_NODES).toBe(20);
+  });
+
+  it('uses text output by default', async () => {
+    const dir = path.join(tmpDir, 'cli-direct-text');
+
+    writeTmp('cli-direct-text/a.js', [
+      'function alpha(items) {',
+      '  const filtered = items.filter(Boolean);',
+      '  return filtered.map(String);',
+      '}',
+    ].join('\n'));
+
+    writeTmp('cli-direct-text/b.js', [
+      'function beta(rows) {',
+      '  const kept = rows.filter(Boolean);',
+      '  return kept.map(String);',
+      '}',
+    ].join('\n'));
+
+    const spinner = createSpinner();
+    const reporter = vi.fn();
+    const result = await runCli(['node', 'dryjs', dir], {
+      reporter,
+      spinnerFactory: () => spinner,
+    });
+
+    expect(result.format).toBe('text');
+    expect(reporter).toHaveBeenCalledTimes(1);
+    expect(reporter.mock.calls[0][1]).toBe('text');
+    expect(spinner.successes[0]).toContain('duplicate pair(s) found');
+  });
+
+  it('honours json shorthand and numeric filters', async () => {
+    const dir = path.join(tmpDir, 'cli-direct-json');
+    writeTmp('cli-direct-json/short.js', [
+      'function tiny(x) {',
+      '  return x;',
+      '}',
+    ].join('\n'));
+
+    const spinner = createSpinner();
+    const reporter = vi.fn();
+    const result = await runCli(['node', 'dryjs', '--json', '--min-lines', '20', '--min-nodes', '50', dir], {
+      reporter,
+      spinnerFactory: () => spinner,
+    });
+
+    expect(result.format).toBe('json');
+    expect(result.entries).toEqual([]);
+    expect(result.pairs).toEqual([]);
+    expect(reporter).toHaveBeenCalledWith([], 'json');
+  });
+
+  it('warns cleanly when no source files are found', async () => {
+    const spinner = createSpinner();
+    const reporter = vi.fn();
+    const result = await runCli(['node', 'dryjs', path.join(tmpDir, 'missing-directory')], {
+      reporter,
+      spinnerFactory: () => spinner,
+    });
+
+    expect(result.files).toEqual([]);
+    expect(result.entries).toEqual([]);
+    expect(result.pairs).toEqual([]);
+    expect(spinner.warnings).toEqual(['No source files found.']);
+    expect(reporter).not.toHaveBeenCalled();
+  });
+}
+);

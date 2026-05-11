@@ -57,8 +57,8 @@ export function formatJson(pairs) {
  */
 export function report(pairs, format = 'text') {
   if (format === 'json') {
-    console.log(formatJson(pairs));
+    globalThis.console.log(formatJson(pairs));
   } else {
-    console.log(formatText(pairs));
+    globalThis.console.log(formatText(pairs));
   }
 }

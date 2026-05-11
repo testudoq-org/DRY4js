@@ -42,18 +42,6 @@ afterAll(() => {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function buildEntry(filePath, node, startLine, endLine) {
-  const normNode = normalise(node);
-  return {
-    file: filePath,
-    startLine,
-    endLine,
-    lineCount: endLine - startLine + 1,
-    nodeCount: countNodes(normNode),
-    fingerprints: fingerprint(normNode),
-  };
-}
-
 async function pipeline(files, opts = {}) {
   const { threshold = 0.82, minLines = 4, minNodes = 20 } = opts;
   const entries = [];
@@ -316,5 +304,28 @@ describe('E2E 6 – Jaccard properties', () => {
       expect(score).toBeGreaterThanOrEqual(0);
       expect(score).toBeLessThanOrEqual(1);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// E2E 7 – Dogfooding: run dryjs against its own src/ folder
+// ---------------------------------------------------------------------------
+
+describe('E2E 7 – dogfooding (scan own src/)', () => {
+  const srcDir = path.resolve('src');
+
+  it('runs the full pipeline against src/ without throwing', async () => {
+    const files = await scanFiles([srcDir]);
+    expect(files.length).toBeGreaterThan(0);
+    const { pairs } = await pipeline(files, { threshold: 0.82, minLines: 4, minNodes: 20 });
+    expect(Array.isArray(pairs)).toBe(true);
+  });
+
+  it('produces valid JSON output from src/', async () => {
+    const files = await scanFiles([srcDir]);
+    const { pairs } = await pipeline(files, { threshold: 0.82, minLines: 4, minNodes: 20 });
+    const json = JSON.parse(formatJson(pairs));
+    expect(json).toHaveProperty('candidates');
+    expect(Array.isArray(json.candidates)).toBe(true);
   });
 });

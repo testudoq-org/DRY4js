@@ -5,13 +5,15 @@
   "type": "module",
   "main": "src/cli.mjs",
   "bin": {
-    "dryjs": "src/cli.mjs"
+    "dryjs": "src/bin.mjs"
   },
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "start": "node src/cli.mjs"
+    "test:crap": "crap4js --coverage-dir ./coverage src",
+    "report": "npm run test:coverage && npm run test:crap",
+    "start": "node src/bin.mjs"
   },
   "keywords": [
     "duplicate",
@@ -21,7 +23,7 @@
     "es6"
   ],
   "author": "",
-  "license": "MIT",
+  "license": "CC-BY-NC-4.0",
   "dependencies": {
     "@babel/parser": "^7.24.0",
     "commander": "^12.0.0",
@@ -30,6 +32,7 @@
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^1.4.0",
+    "crap4js": "^1.0.1-beta.3",
     "vitest": "^1.4.0"
   }
 }

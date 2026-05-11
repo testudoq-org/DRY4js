@@ -38,165 +38,100 @@ export function serialise(normNode) {
 // Internal dispatch
 // ---------------------------------------------------------------------------
 
+const literalNode = () => ({ type: ':literal', children: [] });
+const symbolNode = () => ({ type: ':symbol', children: [] });
+const emptyNode = (type) => ({ type, children: [] });
+
+const NORMALISERS = {
+  FunctionDeclaration: normFunction,
+  FunctionExpression: normFunction,
+  ArrowFunctionExpression: normArrow,
+  VariableDeclaration: normVariableDeclaration,
+  VariableDeclarator: normVariableDeclarator,
+  ClassDeclaration: normClass,
+  ClassExpression: normClass,
+  ClassBody: normClassBody,
+  ClassMethod: normMethod,
+  ClassPrivateMethod: normMethod,
+  ObjectMethod: normMethod,
+  ClassProperty: normClassProperty,
+  ClassPrivateProperty: normClassProperty,
+  BlockStatement: normBlock,
+  ReturnStatement: (node) => normUnary('ReturnStatement', node.argument),
+  ExpressionStatement: (node) => normUnary('ExpressionStatement', node.expression),
+  IfStatement: normIf,
+  WhileStatement: (node) => normBinary('WhileStatement', node.test, node.body),
+  DoWhileStatement: (node) => normBinary('DoWhileStatement', node.body, node.test),
+  ForStatement: normFor,
+  ForInStatement: (node) => normBinary('ForInStatement', node.left, node.body),
+  ForOfStatement: (node) => normBinary('ForOfStatement', node.left, node.body),
+  SwitchStatement: normSwitch,
+  SwitchCase: normSwitchCase,
+  TryStatement: normTry,
+  CatchClause: (node) => normUnary('CatchClause', node.body),
+  ThrowStatement: (node) => normUnary('ThrowStatement', node.argument),
+  BreakStatement: () => emptyNode('BreakStatement'),
+  ContinueStatement: () => emptyNode('ContinueStatement'),
+  LabeledStatement: (node) => normUnary('LabeledStatement', node.body),
+  CallExpression: normCall,
+  OptionalCallExpression: normCall,
+  NewExpression: (node) => normCall({ ...node, type: 'NewExpression' }),
+  AssignmentExpression: (node) => normBinaryExpr('AssignmentExpression', node.left, node.right),
+  BinaryExpression: (node) => normBinaryExpr('BinaryExpression', node.left, node.right),
+  LogicalExpression: (node) => normBinaryExpr('LogicalExpression', node.left, node.right),
+  UnaryExpression: (node) => normUnary('UnaryExpression', node.argument),
+  UpdateExpression: (node) => normUnary('UpdateExpression', node.argument),
+  ConditionalExpression: normTernary,
+  MemberExpression: normMember,
+  OptionalMemberExpression: normMember,
+  ArrayExpression: normArray,
+  ObjectExpression: normObject,
+  ObjectProperty: normObjectProperty,
+  SpreadElement: (node) => normUnary('SpreadElement', node.argument),
+  TemplateLiteral: literalNode,
+  TaggedTemplateExpression: (node) => normBinaryExpr('TaggedTemplateExpression', node.tag, node.quasi),
+  AwaitExpression: (node) => normUnary('AwaitExpression', node.argument),
+  YieldExpression: (node) => normUnary('YieldExpression', node.argument),
+  SequenceExpression: (node) => normChildren('SequenceExpression', node.expressions),
+  AssignmentPattern: (node) => normBinaryExpr('AssignmentPattern', node.left, node.right),
+  RestElement: (node) => normUnary('RestElement', node.argument),
+  ArrayPattern: (node) => normChildren('ArrayPattern', node.elements.filter(Boolean)),
+  ObjectPattern: (node) => normChildren('ObjectPattern', node.properties),
+  ImportDeclaration: () => emptyNode('ImportDeclaration'),
+  ExportNamedDeclaration: (node) => (
+    node.declaration
+      ? normUnary('ExportNamedDeclaration', node.declaration)
+      : emptyNode('ExportNamedDeclaration')
+  ),
+  ExportDefaultDeclaration: (node) => normUnary('ExportDefaultDeclaration', node.declaration),
+  ExportAllDeclaration: () => emptyNode('ExportAllDeclaration'),
+  Identifier: symbolNode,
+  PrivateName: symbolNode,
+  StringLiteral: literalNode,
+  NumericLiteral: literalNode,
+  BooleanLiteral: literalNode,
+  NullLiteral: literalNode,
+  RegExpLiteral: literalNode,
+  BigIntLiteral: literalNode,
+  DecimalLiteral: literalNode,
+  TSTypeAnnotation: (node) => emptyNode(node.type),
+  TSTypeReference: (node) => emptyNode(node.type),
+  TSPropertySignature: (node) => emptyNode(node.type),
+  TSMethodSignature: (node) => emptyNode(node.type),
+  TSInterfaceDeclaration: (node) => emptyNode(node.type),
+  TSTypeAliasDeclaration: (node) => emptyNode(node.type),
+  TSEnumDeclaration: (node) => emptyNode(node.type),
+  JSXElement: normJSXElement,
+  JSXFragment: (node) => normChildren('JSXFragment', node.children),
+  JSXExpressionContainer: (node) => normUnary('JSXExpressionContainer', node.expression),
+  JSXText: literalNode,
+  JSXSpreadChild: (node) => normUnary('JSXSpreadChild', node.expression),
+};
+
 /** @param {import('@babel/types').Node} node */
 function normaliseNode(node) {
-  switch (node.type) {
-    // ── Declarations ──────────────────────────────────────────────────────
-    case 'FunctionDeclaration':
-    case 'FunctionExpression':
-      return normFunction(node);
-    case 'ArrowFunctionExpression':
-      return normArrow(node);
-    case 'VariableDeclaration':
-      return normVariableDeclaration(node);
-    case 'VariableDeclarator':
-      return normVariableDeclarator(node);
-    case 'ClassDeclaration':
-    case 'ClassExpression':
-      return normClass(node);
-    case 'ClassBody':
-      return normClassBody(node);
-    case 'ClassMethod':
-    case 'ObjectMethod':
-      return normMethod(node);
-    case 'ClassProperty':
-    case 'ClassPrivateProperty':
-      return normClassProperty(node);
-
-    // ── Statements ────────────────────────────────────────────────────────
-    case 'BlockStatement':
-      return normBlock(node);
-    case 'ReturnStatement':
-      return normUnary('ReturnStatement', node.argument);
-    case 'ExpressionStatement':
-      return normUnary('ExpressionStatement', node.expression);
-    case 'IfStatement':
-      return normIf(node);
-    case 'WhileStatement':
-      return normBinary('WhileStatement', node.test, node.body);
-    case 'DoWhileStatement':
-      return normBinary('DoWhileStatement', node.body, node.test);
-    case 'ForStatement':
-      return normFor(node);
-    case 'ForInStatement':
-      return normBinary('ForInStatement', node.left, node.body);
-    case 'ForOfStatement':
-      return normBinary('ForOfStatement', node.left, node.body);
-    case 'SwitchStatement':
-      return normSwitch(node);
-    case 'SwitchCase':
-      return normSwitchCase(node);
-    case 'TryStatement':
-      return normTry(node);
-    case 'CatchClause':
-      return normUnary('CatchClause', node.body);
-    case 'ThrowStatement':
-      return normUnary('ThrowStatement', node.argument);
-    case 'BreakStatement':
-    case 'ContinueStatement':
-      return { type: node.type, children: [] };
-    case 'LabeledStatement':
-      return normUnary('LabeledStatement', node.body);
-
-    // ── Expressions ───────────────────────────────────────────────────────
-    case 'CallExpression':
-    case 'OptionalCallExpression':
-      return normCall(node);
-    case 'NewExpression':
-      return normCall({ ...node, type: 'NewExpression' });
-    case 'AssignmentExpression':
-      return normBinaryExpr('AssignmentExpression', node.left, node.right);
-    case 'BinaryExpression':
-    case 'LogicalExpression':
-      return normBinaryExpr(node.type, node.left, node.right);
-    case 'UnaryExpression':
-    case 'UpdateExpression':
-      return normUnary(node.type, node.argument);
-    case 'ConditionalExpression':
-      return normTernary(node);
-    case 'MemberExpression':
-    case 'OptionalMemberExpression':
-      return normMember(node);
-    case 'ArrayExpression':
-      return normArray(node);
-    case 'ObjectExpression':
-      return normObject(node);
-    case 'ObjectProperty':
-      return normObjectProperty(node);
-    case 'SpreadElement':
-      return normUnary('SpreadElement', node.argument);
-    case 'TemplateLiteral':
-      return { type: ':literal', children: [] };
-    case 'TaggedTemplateExpression':
-      return normBinaryExpr('TaggedTemplateExpression', node.tag, node.quasi);
-    case 'AwaitExpression':
-      return normUnary('AwaitExpression', node.argument);
-    case 'YieldExpression':
-      return normUnary('YieldExpression', node.argument);
-    case 'SequenceExpression':
-      return normChildren('SequenceExpression', node.expressions);
-
-    // ── Patterns ──────────────────────────────────────────────────────────
-    case 'AssignmentPattern':
-      return normBinaryExpr('AssignmentPattern', node.left, node.right);
-    case 'RestElement':
-      return normUnary('RestElement', node.argument);
-    case 'ArrayPattern':
-      return normChildren('ArrayPattern', node.elements.filter(Boolean));
-    case 'ObjectPattern':
-      return normChildren('ObjectPattern', node.properties);
-
-    // ── Imports / Exports ─────────────────────────────────────────────────
-    case 'ImportDeclaration':
-      return { type: 'ImportDeclaration', children: [] };
-    case 'ExportNamedDeclaration':
-      return node.declaration
-        ? normUnary('ExportNamedDeclaration', node.declaration)
-        : { type: 'ExportNamedDeclaration', children: [] };
-    case 'ExportDefaultDeclaration':
-      return normUnary('ExportDefaultDeclaration', node.declaration);
-    case 'ExportAllDeclaration':
-      return { type: 'ExportAllDeclaration', children: [] };
-
-    // ── Identifiers & Literals ────────────────────────────────────────────
-    case 'Identifier':
-    case 'PrivateName':
-      return { type: ':symbol', children: [] };
-    case 'StringLiteral':
-    case 'NumericLiteral':
-    case 'BooleanLiteral':
-    case 'NullLiteral':
-    case 'RegExpLiteral':
-    case 'BigIntLiteral':
-    case 'DecimalLiteral':
-      return { type: ':literal', children: [] };
-
-    // ── TypeScript (keep structure, drop type annotations) ────────────────
-    case 'TSTypeAnnotation':
-    case 'TSTypeReference':
-    case 'TSPropertySignature':
-    case 'TSMethodSignature':
-    case 'TSInterfaceDeclaration':
-    case 'TSTypeAliasDeclaration':
-    case 'TSEnumDeclaration':
-      return { type: node.type, children: [] };
-
-    // ── JSX ───────────────────────────────────────────────────────────────
-    case 'JSXElement':
-      return normJSXElement(node);
-    case 'JSXFragment':
-      return normChildren('JSXFragment', node.children);
-    case 'JSXExpressionContainer':
-      return normUnary('JSXExpressionContainer', node.expression);
-    case 'JSXText':
-      return { type: ':literal', children: [] };
-    case 'JSXSpreadChild':
-      return normUnary('JSXSpreadChild', node.expression);
-
-    default:
-      // Unknown node: preserve type, normalise known children if present
-      return { type: node.type, children: [] };
-  }
+  const handler = NORMALISERS[node.type];
+  return handler ? handler(node) : { type: node.type, children: [] };
 }
 
 // ---------------------------------------------------------------------------
@@ -204,6 +139,10 @@ function normaliseNode(node) {
 // ---------------------------------------------------------------------------
 
 function normChildren(type, nodes) {
+  return { type, children: nodes.map(normaliseNode) };
+}
+
+function normNodeList(type, nodes) {
   return { type, children: nodes.map(normaliseNode) };
 }
 
@@ -227,7 +166,7 @@ function normTernary(node) {
 }
 
 function normBlock(node) {
-  return { type: 'BlockStatement', children: node.body.map(normaliseNode) };
+  return normNodeList('BlockStatement', node.body);
 }
 
 function normFunction(node) {
@@ -266,7 +205,7 @@ function normClass(node) {
 }
 
 function normClassBody(node) {
-  return { type: 'ClassBody', children: node.body.map(normaliseNode) };
+  return normNodeList('ClassBody', node.body);
 }
 
 function normMethod(node) {
@@ -336,17 +275,11 @@ function normMember(node) {
 }
 
 function normArray(node) {
-  return {
-    type: 'ArrayExpression',
-    children: node.elements.filter(Boolean).map(normaliseNode),
-  };
+  return normNodeList('ArrayExpression', node.elements.filter(Boolean));
 }
 
 function normObject(node) {
-  return {
-    type: 'ObjectExpression',
-    children: node.properties.map(normaliseNode),
-  };
+  return normNodeList('ObjectExpression', node.properties);
 }
 
 function normObjectProperty(node) {
@@ -357,8 +290,5 @@ function normObjectProperty(node) {
 }
 
 function normJSXElement(node) {
-  return {
-    type: 'JSXElement',
-    children: node.children.map(normaliseNode),
-  };
+  return normNodeList('JSXElement', node.children);
 }

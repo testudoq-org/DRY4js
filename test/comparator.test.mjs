@@ -1,6 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { jaccardSimilarity, findDuplicates } from '../src/comparator.mjs';
-import { formatText, formatJson } from '../src/reporter.mjs';
+import { formatText, formatJson, report } from '../src/reporter.mjs';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 // ---------------------------------------------------------------------------
 // jaccardSimilarity
@@ -191,5 +195,23 @@ describe('formatJson', () => {
     expect(c.right.file).toBe('b.js');
     expect(c).toHaveProperty('leftNodes', 25);
     expect(c).toHaveProperty('rightNodes', 27);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Reporter – report
+// ---------------------------------------------------------------------------
+
+describe('report', () => {
+  it('logs text output by default', () => {
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    report([]);
+    expect(spy).toHaveBeenCalledWith('No duplicate candidates found.');
+  });
+
+  it('logs JSON output when requested', () => {
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    report([], 'json');
+    expect(() => JSON.parse(spy.mock.calls[0][0])).not.toThrow();
   });
 });
