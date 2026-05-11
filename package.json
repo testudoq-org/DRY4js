@@ -1,6 +1,6 @@
 {
-  "name": "dryjs",
-  "version": "0.1.0",
+  "name": "@testudoq/dryjs",
+  "version": "0.1.0-alpha.1",
   "description": "Structural duplicate detector for JavaScript/ES6 code",
   "type": "module",
   "main": "src/cli.mjs",
@@ -44,7 +44,7 @@
   "license": "CC-BY-NC-4.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/testudoq/DRY4js.git"
+    "url": "git+https://github.com/testudoq/DRY4js.git"
   },
   "homepage": "https://github.com/testudoq/DRY4js#readme",
   "bugs": {
