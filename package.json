@@ -1,5 +1,5 @@
 {
-  "name": "@testudoq/dry4js",
+  "name": "dry-4-js",
   "version": "0.1.0-alpha.1",
   "description": "Structural duplicate detector for JavaScript/ES6 code",
   "type": "module",
