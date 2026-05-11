@@ -1,11 +1,11 @@
 {
-  "name": "@testudoq/dryjs",
+  "name": "@testudoq/dry4js",
   "version": "0.1.0-alpha.1",
   "description": "Structural duplicate detector for JavaScript/ES6 code",
   "type": "module",
   "main": "src/cli.mjs",
   "bin": {
-    "dryjs": "src/bin.mjs"
+    "dry4js": "src/bin.mjs"
   },
   "exports": {
     ".": "./src/cli.mjs",
