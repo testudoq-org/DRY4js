@@ -7,13 +7,31 @@
   "bin": {
     "dryjs": "src/bin.mjs"
   },
+  "exports": {
+    ".": "./src/cli.mjs",
+    "./scanner": "./src/scanner.mjs",
+    "./parser": "./src/parser.mjs",
+    "./normaliser": "./src/normaliser.mjs",
+    "./fingerprinter": "./src/fingerprinter.mjs",
+    "./comparator": "./src/comparator.mjs",
+    "./reporter": "./src/reporter.mjs"
+  },
+  "files": [
+    "src/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:crap": "crap4js --coverage-dir ./coverage src",
     "report": "npm run test:coverage && npm run test:crap",
-    "start": "node src/bin.mjs"
+    "start": "node src/bin.mjs",
+    "prepublishOnly": "npm test"
   },
   "keywords": [
     "duplicate",
@@ -22,8 +40,16 @@
     "javascript",
     "es6"
   ],
-  "author": "",
+  "author": "testudoq",
   "license": "CC-BY-NC-4.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/testudoq/DRY4js.git"
+  },
+  "homepage": "https://github.com/testudoq/DRY4js#readme",
+  "bugs": {
+    "url": "https://github.com/testudoq/DRY4js/issues"
+  },
   "dependencies": {
     "@babel/parser": "^7.24.0",
     "commander": "^12.0.0",
