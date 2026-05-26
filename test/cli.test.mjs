@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import { spawnSync } from 'child_process';
 
 import { scanFiles } from '../src/scanner.mjs';
 import { parseFile } from '../src/parser.mjs';
@@ -305,6 +306,113 @@ describe('runCli', () => {
     expect(result.pairs).toEqual([]);
     expect(spinner.warnings).toEqual(['No source files found.']);
     expect(reporter).not.toHaveBeenCalled();
+  });
+
+  it('respects max-files and stops scanning after the limit', async () => {
+    const dir = path.join(tmpDir, 'cli-max-files');
+    writeTmp('cli-max-files/a.js', 'function a() { return 1; }');
+    writeTmp('cli-max-files/b.js', 'function b() { return 2; }');
+
+    const spinner = createSpinner();
+    const reporter = vi.fn();
+    const result = await runCli(['node', 'dryjs', '--max-files', '1', dir], {
+      reporter,
+      spinnerFactory: () => spinner,
+    });
+
+    expect(result.files.length).toBe(1);
+  });
+
+  it('respects max-forms and limits candidate collection', async () => {
+    const dir = path.join(tmpDir, 'cli-max-forms');
+    writeTmp('cli-max-forms/a.js', [
+      'function one(x) {',
+      '  return x + 1;',
+      '}',
+      'function two(x) {',
+      '  return x * 2;',
+      '}',
+    ].join('\n'));
+    writeTmp('cli-max-forms/b.js', [
+      'function three(y) {',
+      '  return y - 1;',
+      '}',
+    ].join('\n'));
+
+    const spinner = createSpinner();
+    const reporter = vi.fn();
+    const result = await runCli(['node', 'dryjs', '--max-forms', '1', dir], {
+      reporter,
+      spinnerFactory: () => spinner,
+    });
+
+    expect(result.entries.length).toBeLessThanOrEqual(1);
+  });
+
+  it('supports ignore file patterns with --ignore-file', async () => {
+    const dir = path.join(tmpDir, 'cli-ignore-file');
+    writeTmp('cli-ignore-file/a.js', 'function keepA() { return 1; }');
+    writeTmp('cli-ignore-file/ignore.js', 'function skipB() { return 2; }');
+
+    const ignoreFile = path.join(tmpDir, 'cli-ignore-file.dry4jsignore');
+    fs.writeFileSync(ignoreFile, 'cli-ignore-file/ignore.js\n', 'utf8');
+
+    const spinner = createSpinner();
+    const reporter = vi.fn();
+    const result = await runCli(['node', 'dryjs', '--ignore-file', ignoreFile, dir], {
+      reporter,
+      spinnerFactory: () => spinner,
+    });
+
+    expect(result.files.every((file) => !file.endsWith('ignore.js'))).toBe(true);
+  });
+
+  it('exits with code 1 for duplicates when --fail-on-duplicates is used', async () => {
+    const dir = path.join(tmpDir, 'cli-fail-on-duplicates');
+    writeTmp('cli-fail-on-duplicates/a.js', [
+      'function alpha(xs) {',
+      '  return xs.map(String);',
+      '}',
+    ].join('\n'));
+    writeTmp('cli-fail-on-duplicates/b.js', [
+      'function beta(rows) {',
+      '  return rows.map(String);',
+      '}',
+    ].join('\n'));
+
+    const spinner = createSpinner();
+    const reporter = vi.fn();
+    const result = await runCli(['node', 'dryjs', '--fail-on-duplicates', '--json', '--min-lines', '1', '--min-nodes', '1', dir], {
+      reporter,
+      spinnerFactory: () => spinner,
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.pairs.length).toBeGreaterThan(0);
+  });
+
+  it('runs the packaged CLI binary via src/bin.mjs with JSON output', () => {
+    const dir = path.join(tmpDir, 'cli-packaged');
+    writeTmp('cli-packaged/a.js', [
+      'function delta(xs) {',
+      '  return xs.filter(Boolean);',
+      '}',
+    ].join('\n'));
+    writeTmp('cli-packaged/b.js', [
+      'function epsilon(rows) {',
+      '  return rows.filter(Boolean);',
+      '}',
+    ].join('\n'));
+
+    const binary = path.resolve('src/bin.mjs');
+    const result = spawnSync(process.execPath, [binary, '--json', dir], {
+      encoding: 'utf8',
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('candidates');
+    const parsed = JSON.parse(result.stdout);
+    expect(Array.isArray(parsed.candidates)).toBe(true);
   });
 }
 );
