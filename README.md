@@ -140,6 +140,16 @@ npm run test:watch    # watch mode
 npm run test:coverage # tests + coverage report
 ```
 
+## Publishing
+
+Publishing to npm requires valid npm authentication and maintainer access for `dry-4-js`.
+
+- Authenticate with `npm login` or configure an npm token in `~/.npmrc`.
+- Confirm auth with `npm whoami` before publishing.
+- If you do not have publish rights, request npm maintainer access for this package.
+- The release workflow uses `npm publish --access public` from the repository root.
+- A successful publish also depends on passing `npm test`, since `prepublishOnly` runs the test suite.
+
 ## Testing
 
 107 tests across 6 test files covering:
