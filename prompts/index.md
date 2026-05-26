@@ -32,6 +32,8 @@ Output only the code diffs/snippets + short explanation for each change.
 
 #### Prompt 9.2 – Hybrid Fast Filter + Accurate Second Stage
 
+**Status**: Completed — stage 1 fast size-based filtering plus stage 2 fingerprint comparison implemented with `--fast-filter-threshold` and `--max-candidates`.
+
 ```
 Enhance the DRY4js duplication detector with a simple two-stage pipeline to improve speed and accuracy without complexity.
 

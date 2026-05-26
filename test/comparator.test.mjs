@@ -74,8 +74,8 @@ describe('combinedSimilarity', () => {
 // findDuplicates
 // ---------------------------------------------------------------------------
 
-function makeEntry(file, startLine, endLine, fps) {
-  return { file, startLine, endLine, lineCount: endLine - startLine + 1, nodeCount: 30, fingerprints: new Set(fps) };
+function makeEntry(file, startLine, endLine, fps, nodeCount = 30) {
+  return { file, startLine, endLine, lineCount: endLine - startLine + 1, nodeCount, fingerprints: new Set(fps) };
 }
 
 describe('findDuplicates', () => {
@@ -149,6 +149,23 @@ describe('findDuplicates', () => {
     expect(results.length).toBe(1);
     const expected = 0.5 * (9 / 11) + 0.5 * (18 / 20);
     expect(results[0].score).toBeCloseTo(expected);
+  });
+
+  it('filters clearly dissimilar size pairs before full comparison', () => {
+    const a = makeEntry('a.js', 1, 10, ['shared', 'x', 'y', 'z'], 100);
+    const b = makeEntry('b.js', 1, 10, ['shared', 'x', 'y', 'z'], 20);
+    const results = findDuplicates([a, b], { threshold: 0, fastFilterThreshold: 0.3 });
+    expect(results.length).toBe(0);
+  });
+
+  it('limits comparisons using maxCandidates after the fast filter', () => {
+    const entries = [
+      makeEntry('a.js', 1, 10, ['a', 'b', 'c'], 30),
+      makeEntry('b.js', 1, 10, ['a', 'b', 'c'], 30),
+      makeEntry('c.js', 1, 10, ['a', 'b', 'c'], 30),
+    ];
+    const results = findDuplicates(entries, { threshold: 0, fastFilterThreshold: 0, maxCandidates: 1 });
+    expect(results.length).toBe(1);
   });
 
   it('each result has score, left, and right properties', () => {

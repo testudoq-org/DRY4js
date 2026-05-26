@@ -80,6 +80,8 @@ async function executeScan(paths, opts, spinnerFactory, reporter) {
   const minNodes = opts.minNodes;
   const maxFiles = opts.maxFiles;
   const maxForms = opts.maxForms;
+  const maxCandidates = opts.maxCandidates;
+  const fastFilterThreshold = typeof opts.fastFilterThreshold === 'number' ? opts.fastFilterThreshold : undefined;
   const exclude = opts.exclude || [];
   const ignoreFile = opts.ignoreFile;
   const failOnDuplicates = Boolean(opts.failOnDuplicates);
@@ -104,7 +106,13 @@ async function executeScan(paths, opts, spinnerFactory, reporter) {
   }
 
   spinner.text = `Comparing ${entries.length} candidate form(s)…`;
-  const pairs = findDuplicates(entries, { threshold, metric: similarityMetric, combinedWeight: similarityWeight });
+  const pairs = findDuplicates(entries, {
+    threshold,
+    metric: similarityMetric,
+    combinedWeight: similarityWeight,
+    fastFilterThreshold,
+    maxCandidates,
+  });
   const result = buildResult({ files, entries, pairs, format, failOnDuplicates, spinner });
 
   reporter(pairs, format);
@@ -123,6 +131,8 @@ export function buildProgram({ spinnerFactory = (options) => ora(options), repor
     .option('-t, --threshold <n>', 'Minimum similarity score', Number.parseFloat)
     .option('--similarity-metric <metric>', 'Similarity metric: jaccard, dice, cosine, combined', 'jaccard')
     .option('--similarity-weight <n>', 'Combined similarity weight (jaccard vs dice)', Number.parseFloat, 0.5)
+    .option('--fast-filter-threshold <n>', 'Stage 1 size similarity threshold for candidate filtering', Number.parseFloat, 0.25)
+    .option('--max-candidates <n>', 'Maximum number of candidate pairs to compare after the fast filter', parseInteger)
     .option('--min-lines <n>', 'Minimum source lines in a candidate form', parseInteger, DEFAULT_MIN_LINES)
     .option('--min-nodes <n>', 'Minimum normalised node count', parseInteger, DEFAULT_MIN_NODES)
     .option('--max-files <n>', 'Maximum number of files to scan', parseInteger)
