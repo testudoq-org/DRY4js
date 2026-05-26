@@ -76,7 +76,6 @@ function buildResult({ files, entries, pairs, format, failOnDuplicates, spinner 
 
 async function executeScan(paths, opts, spinnerFactory, reporter) {
   const format = opts.json ? 'json' : opts.format;
-  const threshold = opts.threshold;
   const minLines = opts.minLines;
   const minNodes = opts.minNodes;
   const maxFiles = opts.maxFiles;
@@ -84,6 +83,9 @@ async function executeScan(paths, opts, spinnerFactory, reporter) {
   const exclude = opts.exclude || [];
   const ignoreFile = opts.ignoreFile;
   const failOnDuplicates = Boolean(opts.failOnDuplicates);
+  const similarityMetric = opts.similarityMetric;
+  const similarityWeight = opts.similarityWeight;
+  const threshold = typeof opts.threshold === 'number' ? opts.threshold : undefined;
 
   const spinner = spinnerFactory({ text: 'Scanning files…', isSilent: format === 'json' }).start();
 
@@ -102,7 +104,7 @@ async function executeScan(paths, opts, spinnerFactory, reporter) {
   }
 
   spinner.text = `Comparing ${entries.length} candidate form(s)…`;
-  const pairs = findDuplicates(entries, { threshold });
+  const pairs = findDuplicates(entries, { threshold, metric: similarityMetric, combinedWeight: similarityWeight });
   const result = buildResult({ files, entries, pairs, format, failOnDuplicates, spinner });
 
   reporter(pairs, format);
@@ -116,9 +118,11 @@ export function buildProgram({ spinnerFactory = (options) => ora(options), repor
   program
     .name('dryjs')
     .description('Structural duplicate detector for JavaScript/ES6 code')
-    .version('0.1.0')
+    .version('0.3.0-alpha.4')
     .argument('[paths...]', 'Files or directories to scan', ['src'])
-    .option('-t, --threshold <n>', 'Minimum similarity score', Number.parseFloat, DEFAULT_THRESHOLD)
+    .option('-t, --threshold <n>', 'Minimum similarity score', Number.parseFloat)
+    .option('--similarity-metric <metric>', 'Similarity metric: jaccard, dice, cosine, combined', 'jaccard')
+    .option('--similarity-weight <n>', 'Combined similarity weight (jaccard vs dice)', Number.parseFloat, 0.5)
     .option('--min-lines <n>', 'Minimum source lines in a candidate form', parseInteger, DEFAULT_MIN_LINES)
     .option('--min-nodes <n>', 'Minimum normalised node count', parseInteger, DEFAULT_MIN_NODES)
     .option('--max-files <n>', 'Maximum number of files to scan', parseInteger)
