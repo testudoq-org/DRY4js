@@ -52,9 +52,58 @@ export function combinedSimilarity(a, b, weight = 0.5) {
   return weight * jaccard + (1 - weight) * dice;
 }
 
+export function sizeSimilarity(left, right) {
+  if (left.nodeCount === 0 || right.nodeCount === 0) return 0;
+  const minCount = Math.min(left.nodeCount, right.nodeCount);
+  const maxCount = Math.max(left.nodeCount, right.nodeCount);
+  return maxCount === 0 ? 0 : minCount / maxCount;
+}
+
+function isSameLocation(left, right) {
+  return left.file === right.file && left.startLine === right.startLine;
+}
+
+function createStageOnePair(left, right) {
+  return { left, right, score: sizeSimilarity(left, right) };
+}
+
+function passesFastFilter(pair, threshold) {
+  return pair.score >= threshold;
+}
+
+function limitStageOneCandidates(candidates, maxCandidates) {
+  if (typeof maxCandidates !== 'number' || !Number.isFinite(maxCandidates) || maxCandidates <= 0) {
+    return candidates;
+  }
+
+  if (candidates.length <= maxCandidates) return candidates;
+  candidates.sort((a, b) => b.score - a.score);
+  candidates.length = maxCandidates;
+  return candidates;
+}
+
+export function fastFilterPairs(entries, { fastFilterThreshold = DEFAULT_FAST_FILTER_THRESHOLD, maxCandidates } = {}) {
+  const candidates = [];
+
+  for (let i = 0; i < entries.length; i++) {
+    for (let j = i + 1; j < entries.length; j++) {
+      const left = entries[i];
+      const right = entries[j];
+      if (isSameLocation(left, right)) continue;
+
+      const pair = createStageOnePair(left, right);
+      if (!passesFastFilter(pair, fastFilterThreshold)) continue;
+      candidates.push(pair);
+    }
+  }
+
+  return limitStageOneCandidates(candidates, maxCandidates);
+}
+
 const SUPPORTED_METRICS = new Set(['jaccard', 'dice', 'cosine', 'combined']);
 const DEFAULT_COMBINED_THRESHOLD = 0.78;
 const DEFAULT_JACCARD_THRESHOLD = 0.82;
+const DEFAULT_FAST_FILTER_THRESHOLD = 0.25;
 
 function getSimilarityFunction(metric, combinedWeight) {
   switch (metric) {
@@ -82,7 +131,7 @@ function getSimilarityFunction(metric, combinedWeight) {
  * @param {number} [options.combinedWeight=0.5] - Weight used for combined score
  * @returns {DuplicatePair[]}
  */
-export function findDuplicates(entries, { threshold, metric = 'jaccard', combinedWeight = 0.5 } = {}) {
+export function findDuplicates(entries, { threshold, metric = 'jaccard', combinedWeight = 0.5, fastFilterThreshold = DEFAULT_FAST_FILTER_THRESHOLD, maxCandidates } = {}) {
   if (!SUPPORTED_METRICS.has(metric)) {
     throw new Error(`Unsupported similarity metric: ${metric}`);
   }
@@ -94,20 +143,13 @@ export function findDuplicates(entries, { threshold, metric = 'jaccard', combine
       ? DEFAULT_COMBINED_THRESHOLD
       : DEFAULT_JACCARD_THRESHOLD;
 
+  const stageOnePairs = fastFilterPairs(entries, { fastFilterThreshold, maxCandidates });
   const results = [];
 
-  for (let i = 0; i < entries.length; i++) {
-    for (let j = i + 1; j < entries.length; j++) {
-      const left = entries[i];
-      const right = entries[j];
-
-      // Skip pairs at the exact same location
-      if (left.file === right.file && left.startLine === right.startLine) continue;
-
-      const score = scoreFn(left.fingerprints, right.fingerprints);
-      if (score >= effectiveThreshold) {
-        results.push({ score, left, right });
-      }
+  for (const { left, right } of stageOnePairs) {
+    const score = scoreFn(left.fingerprints, right.fingerprints);
+    if (score >= effectiveThreshold) {
+      results.push({ score, left, right });
     }
   }
 

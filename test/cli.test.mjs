@@ -318,6 +318,40 @@ describe('runCli', () => {
     expect(result.pairs.length).toBeGreaterThanOrEqual(0);
   });
 
+  it('accepts max-candidates and fast filter options', async () => {
+    const dir = path.join(tmpDir, 'cli-fast-filter');
+    writeTmp('cli-fast-filter/a.js', [
+      'function a(xs) {',
+      '  return xs.filter(Boolean).map(String);',
+      '}',
+    ].join('\n'));
+    writeTmp('cli-fast-filter/b.js', [
+      'function b(rows) {',
+      '  return rows.filter(Boolean).map(String);',
+      '}',
+    ].join('\n'));
+
+    const spinner = createSpinner();
+    const reporter = vi.fn();
+    const result = await runCli([
+      'node',
+      'dryjs',
+      '--max-candidates',
+      '1',
+      '--fast-filter-threshold',
+      '0.2',
+      '--json',
+      dir,
+    ], {
+      reporter,
+      spinnerFactory: () => spinner,
+    });
+
+    expect(result.format).toBe('json');
+    expect(reporter).toHaveBeenCalledWith(expect.any(Array), 'json');
+    expect(result.pairs.length).toBeGreaterThanOrEqual(0);
+  });
+
   it('warns cleanly when no source files are found', async () => {
     const spinner = createSpinner();
     const reporter = vi.fn();
