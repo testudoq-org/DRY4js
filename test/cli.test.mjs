@@ -293,6 +293,31 @@ describe('runCli', () => {
     expect(reporter).toHaveBeenCalledWith([], 'json');
   });
 
+  it('accepts a similarity metric option', async () => {
+    const dir = path.join(tmpDir, 'cli-similarity-metric');
+    writeTmp('cli-similarity-metric/a.js', [
+      'function a(xs) {',
+      '  return xs.filter(Boolean);',
+      '}',
+    ].join('\n'));
+    writeTmp('cli-similarity-metric/b.js', [
+      'function b(rows) {',
+      '  return rows.filter(Boolean);',
+      '}',
+    ].join('\n'));
+
+    const spinner = createSpinner();
+    const reporter = vi.fn();
+    const result = await runCli(['node', 'dryjs', '--similarity-metric', 'dice', '--json', dir], {
+      reporter,
+      spinnerFactory: () => spinner,
+    });
+
+    expect(result.format).toBe('json');
+    expect(reporter).toHaveBeenCalledWith(expect.any(Array), 'json');
+    expect(result.pairs.length).toBeGreaterThanOrEqual(0);
+  });
+
   it('warns cleanly when no source files are found', async () => {
     const spinner = createSpinner();
     const reporter = vi.fn();

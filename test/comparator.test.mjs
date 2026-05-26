@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { jaccardSimilarity, findDuplicates } from '../src/comparator.mjs';
+import { jaccardSimilarity, diceSimilarity, cosineSimilarity, combinedSimilarity, findDuplicates } from '../src/comparator.mjs';
 import { formatText, formatJson, report } from '../src/reporter.mjs';
 
 afterEach(() => {
@@ -44,6 +44,29 @@ describe('jaccardSimilarity', () => {
     const a = new Set(['p', 'q', 'r']);
     const b = new Set(['q', 'r', 's']);
     expect(jaccardSimilarity(a, b)).toBeCloseTo(2 / 4);
+  });
+});
+
+describe('diceSimilarity', () => {
+  it('identical sets have score 1.0', () => {
+    const a = new Set(['x', 'y']);
+    const b = new Set(['x', 'y']);
+    expect(diceSimilarity(a, b)).toBe(1.0);
+  });
+
+  it('computes double intersection over total size', () => {
+    const a = new Set(['a', 'b', 'c']);
+    const b = new Set(['b', 'c', 'd']);
+    expect(diceSimilarity(a, b)).toBeCloseTo(4 / 6);
+  });
+});
+
+describe('combinedSimilarity', () => {
+  it('averages jaccard and dice when weight is 0.5', () => {
+    const a = new Set(['a', 'b', 'c']);
+    const b = new Set(['b', 'c', 'd']);
+    const expected = 0.5 * (2 / 4) + 0.5 * (4 / 6);
+    expect(combinedSimilarity(a, b, 0.5)).toBeCloseTo(expected);
   });
 });
 
@@ -109,6 +132,23 @@ describe('findDuplicates', () => {
     const b = makeEntry('b.js', 1, 10, fps);
     const results = findDuplicates([a, b]);
     expect(results.length).toBe(1);
+  });
+
+  it('supports dice similarity when requested', () => {
+    const a = makeEntry('a.js', 1, 10, ['a', 'b', 'c', 'd']);
+    const b = makeEntry('b.js', 1, 10, ['c', 'd', 'e', 'f']);
+    const results = findDuplicates([a, b], { metric: 'dice', threshold: 0.5 });
+    expect(results.length).toBe(1);
+    expect(results[0].score).toBeCloseTo(4 / 8);
+  });
+
+  it('supports combined similarity with a lower default threshold', () => {
+    const a = makeEntry('a.js', 1, 10, ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']);
+    const b = makeEntry('b.js', 1, 10, ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'x']);
+    const results = findDuplicates([a, b], { metric: 'combined' });
+    expect(results.length).toBe(1);
+    const expected = 0.5 * (9 / 11) + 0.5 * (18 / 20);
+    expect(results[0].score).toBeCloseTo(expected);
   });
 
   it('each result has score, left, and right properties', () => {

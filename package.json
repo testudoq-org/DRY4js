@@ -1,6 +1,6 @@
 {
   "name": "dry-4-js",
-  "version": "0.3.0-alpha.3",
+  "version": "0.3.0-alpha.4",
   "description": "Structural duplicate detector for JavaScript/ES6 code",
   "type": "module",
   "main": "src/cli.mjs",
@@ -62,7 +62,7 @@
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.1.7",
-    "crap4js": "^1.0.1-beta.0",
+    "crap4js": "^1.0.1-beta.3",
     "vitest": "^4.1.7"
   }
 }
