@@ -49,6 +49,10 @@ Functions that share *most* of their structure score below `1.0` (e.g. `0.89`) �
 npm install
 ```
 
+## Prompt organisation
+
+Active prompt definitions live in `prompts/`, while archived prompt reports and historical prompt artifacts are stored in `prompt-history/`.
+
 ## Usage
 
 ```sh
@@ -57,24 +61,38 @@ node src/cli.mjs [options] [paths...]
 
 ### Options
 
-| Flag                    | Description                             | Default  |
-| ----------------------- | --------------------------------------- | -------- |
-| `-t, --threshold <n>` | Minimum similarity score                | `0.82` |
-| `--min-lines <n>`     | Minimum source lines per candidate form | `4`    |
-| `--min-nodes <n>`     | Minimum normalised node count           | `20`   |
-| `-f, --format <fmt>`  | Output format:`text` or `json`      | `text` |
-| `--json`              | Shorthand for `--format json`         |          |
-| `-V, --version`       | Show version                            |          |
-| `-h, --help`          | Show help                               |          |
+| Flag                        | Description                                                            | Default  |
+| --------------------------- | ---------------------------------------------------------------------- | -------- |
+| `-t, --threshold <n>`       | Minimum similarity score                                               | `0.82` |
+| `--min-lines <n>`          | Minimum source lines per candidate form                                | `4`    |
+| `--min-nodes <n>`          | Minimum normalised node count                                          | `20`   |
+| `--max-files <n>`          | Maximum number of files to scan                                        | —      |
+| `--max-forms <n>`          | Maximum number of candidate forms to compare                           | —      |
+| `--exclude <pattern>`      | Glob pattern to exclude files or directories from scanning             | —      |
+| `--ignore-file <path>`     | Path to ignore file (default: `.dry4jsignore`)                         | `.dry4jsignore` |
+| `--fail-on-duplicates`     | Exit with status `1` when duplicate candidates are found               | —      |
+| `-f, --format <fmt>`       | Output format: `text` or `json`                                        | `text` |
+| `--json`                   | Shorthand for `--format json`                                          |        |
+| `-V, --version`            | Show version                                                           |        |
+| `-h, --help`               | Show help                                                              |        |
 
 ### Examples
 
 ```sh
+# Quickstart with the installed CLI
+npx dry4js .
+
 # Scan src/ directory (default)
 node src/cli.mjs
 
 # Scan multiple paths
 node src/cli.mjs src lib
+
+# Ignore files or directories from scanning
+node src/cli.mjs --exclude 'src/**/*.test.js' --exclude 'src/vendor/**' src
+
+# Use a custom ignore file
+node src/cli.mjs --ignore-file .dry4jsignore src
 
 # Higher threshold — only near-perfect structural matches
 node src/cli.mjs --threshold 0.9 src
@@ -84,6 +102,9 @@ node src/cli.mjs --threshold 0.7 src
 
 # JSON output for tooling / CI
 node src/cli.mjs --json src
+
+# Fail CI when duplicates are found
+node src/cli.mjs --fail-on-duplicates --json src
 
 # Tune sensitivity (skip short forms)
 node src/cli.mjs --min-lines 6 --min-nodes 30 src

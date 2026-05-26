@@ -218,3 +218,33 @@ text---
    git pull
    git checkout -b feature/crap-analysis-coverage
 ```
+
+---
+
+#### **Prompt 8 – Improvement Audit & Implementation**
+
+Markdown
+
+```
+You are working on the dryjs project.
+
+Read `.github/copilot-instructions.md`, `ARCHITECTURE.md`, `PROMPT-ADDENDUM.md`, and `DEVELOPMENT-WORKFLOW.md` first.
+
+Switch to **new branch** `feature/prompt-9`.
+
+Review the repository for package configuration, CLI orchestration, error handling, test coverage, performance, and documentation.
+
+Use the following executive summary as the starting analysis point:
+
+- ESM configuration and entry points
+- CLI orchestration and async flow
+- Error handling and resilience
+- Testing gaps and edge cases
+- Performance and scalability
+- Documentation and DX
+
+Update package metadata, improve CLI structure, add integration tests, document the plan, and create a concise improvement backlog.
+
+Create `PROMPT-8-IMPROVEMENTS.md` containing the detailed review and implementation tasks.
+```
+```

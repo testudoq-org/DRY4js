@@ -47,4 +47,11 @@ This tool is a **structural** (not textual) duplicate detector. The goal is to f
 **When using any prompt for this project, always start with:**
 
 > "You are working on the dryjs project. Read `.github/copilot-instructions.md`, `ARCHITECTURE.md`, and `PROMPT-ADDENDUM.md` first. Confirm you understand the fixed child traversal order and normalisation rules before writing code."
+
+## Prompt organization
+
+- Active prompt definitions live in `prompts/`.
+- Historical prompt reports and archived prompt executions live in `prompt-history/`.
+- Do not add new prompt definitions to `prompt-history/`.
+- If a prompt or report is no longer current, keep it in `prompt-history/` rather than in `prompts/`.
 >
