@@ -62,6 +62,8 @@ Focus on maintainability. Use only built-in Node APIs + existing dependencies.
 
 #### Prompt 9.3 – Better Normalization to Reduce False Positives/Negatives
 
+**Status**: Completed — improved normalization context, stable symbol mapping, and optional semantic literal handling in `src/normaliser.mjs`.
+
 ```
 Review and improve the AST normalization logic in DRY4js to get better duplication detection accuracy.
 
@@ -82,6 +84,8 @@ Provide concrete code examples for improved normalizeFunction() or equivalent, i
 
 #### Prompt 9.4 – Threshold Tuning + Validation Strategy
 
+**Status**: Pending
+
 ```
 Help improve duplication detection reliability in DRY4js.
 
@@ -100,6 +104,8 @@ Provide:
 ---
 
 #### Prompt 9.5 – Overall Balanced Improvement Plan
+
+**Status**: Pending
 
 ```
 Give me a minimal, high-impact improvement plan for DRY4js duplication detection.

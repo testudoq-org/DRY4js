@@ -19,9 +19,10 @@
  * @param {import('@babel/types').Node|null|undefined} node
  * @returns {NormNode}
  */
-export function normalise(node) {
+export function normalise(node, options = {}) {
   if (node == null) return { type: ':null', children: [] };
-  return normaliseNode(node);
+  const context = createNormaliserContext(options);
+  return normaliseNode(node, context);
 }
 
 /**
@@ -34,12 +35,20 @@ export function serialise(normNode) {
   return JSON.stringify(normNode);
 }
 
+function createNormaliserContext({ semantic = false } = {}) {
+  return {
+    semantic,
+    symbolMap: new Map(),
+    nextSymbolId: 0,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Internal dispatch
 // ---------------------------------------------------------------------------
 
-const literalNode = () => ({ type: ':literal', children: [] });
-const symbolNode = () => ({ type: ':symbol', children: [] });
+const literalNode = (node, context) => formatLiteral(node, context);
+const symbolNode = (node, context) => ({ type: mapSymbol(node, context), children: [] });
 const emptyNode = (type) => ({ type, children: [] });
 
 const NORMALISERS = {
@@ -129,166 +138,194 @@ const NORMALISERS = {
 };
 
 /** @param {import('@babel/types').Node} node */
-function normaliseNode(node) {
+function normaliseNode(node, context) {
   const handler = NORMALISERS[node.type];
-  return handler ? handler(node) : { type: node.type, children: [] };
+  return handler ? handler(node, context) : { type: node.type, children: [] };
+}
+
+function mapSymbol(node, context) {
+  const name = node.type === 'PrivateName' ? node.id.name : node.name;
+  if (!context.symbolMap.has(name)) {
+    context.symbolMap.set(name, `:symbol${context.nextSymbolId++}`);
+  }
+  return context.symbolMap.get(name);
+}
+
+function formatLiteral(node, context) {
+  if (!context.semantic) return { type: ':literal', children: [] };
+
+  switch (node.type) {
+    case 'BooleanLiteral':
+      return { type: `:literal-boolean-${node.value}`, children: [] };
+    case 'NullLiteral':
+      return { type: ':literal-null', children: [] };
+    case 'NumericLiteral': {
+      const value = node.value;
+      return Number.isFinite(value) && Math.abs(value) <= 1
+        ? { type: `:literal-number-${value}`, children: [] }
+        : { type: ':literal', children: [] };
+    }
+    case 'StringLiteral': {
+      const value = node.value;
+      return value.length <= 4
+        ? { type: `:literal-string-${value}`, children: [] }
+        : { type: ':literal', children: [] };
+    }
+    default:
+      return { type: ':literal', children: [] };
+  }
 }
 
 // ---------------------------------------------------------------------------
 // Builders
 // ---------------------------------------------------------------------------
 
-function normChildren(type, nodes) {
-  return { type, children: nodes.map(normaliseNode) };
+function normChildren(type, nodes, context) {
+  return { type, children: nodes.map((child) => normaliseNode(child, context)) };
 }
 
-function normNodeList(type, nodes) {
-  return { type, children: nodes.map(normaliseNode) };
+function normNodeList(type, nodes, context) {
+  return { type, children: nodes.map((child) => normaliseNode(child, context)) };
 }
 
-function normUnary(type, child) {
-  return { type, children: child ? [normaliseNode(child)] : [] };
+function normUnary(type, child, context) {
+  return { type, children: child ? [normaliseNode(child, context)] : [] };
 }
 
-function normBinary(type, a, b) {
-  return { type, children: [normaliseNode(a), normaliseNode(b)] };
+function normBinary(type, a, b, context) {
+  return { type, children: [normaliseNode(a, context), normaliseNode(b, context)] };
 }
 
-function normBinaryExpr(type, left, right) {
-  return { type, children: [normaliseNode(left), normaliseNode(right)] };
+function normBinaryExpr(type, left, right, context) {
+  return { type, children: [normaliseNode(left, context), normaliseNode(right, context)] };
 }
 
-function normTernary(node) {
+function normTernary(node, context) {
   return {
     type: 'ConditionalExpression',
-    children: [normaliseNode(node.test), normaliseNode(node.consequent), normaliseNode(node.alternate)],
+    children: [normaliseNode(node.test, context), normaliseNode(node.consequent, context), normaliseNode(node.alternate, context)],
   };
 }
 
-function normBlock(node) {
-  return normNodeList('BlockStatement', node.body);
+function normBlock(node, context) {
+  return normNodeList('BlockStatement', node.body, context);
 }
 
-function normFunction(node) {
-  // params first (fixed order), then body
+function normFunction(node, context) {
   const children = [
-    ...node.params.map(normaliseNode),
-    normaliseNode(node.body),
+    ...node.params.map((param) => normaliseNode(param, context)),
+    normaliseNode(node.body, context),
   ];
   return { type: node.type, children };
 }
 
-function normArrow(node) {
+function normArrow(node, context) {
   const children = [
-    ...node.params.map(normaliseNode),
-    normaliseNode(node.body),
+    ...node.params.map((param) => normaliseNode(param, context)),
+    normaliseNode(node.body, context),
   ];
   return { type: 'ArrowFunctionExpression', children };
 }
 
-function normVariableDeclaration(node) {
-  return { type: 'VariableDeclaration', children: node.declarations.map(normVariableDeclarator) };
+function normVariableDeclaration(node, context) {
+  return { type: 'VariableDeclaration', children: node.declarations.map((declarator) => normVariableDeclarator(declarator, context)) };
 }
 
-function normVariableDeclarator(node) {
+function normVariableDeclarator(node, context) {
   return {
     type: 'VariableDeclarator',
-    children: node.init ? [normaliseNode(node.id), normaliseNode(node.init)] : [normaliseNode(node.id)],
+    children: node.init ? [normaliseNode(node.id, context), normaliseNode(node.init, context)] : [normaliseNode(node.id, context)],
   };
 }
 
-function normClass(node) {
+function normClass(node, context) {
   const children = [];
-  if (node.superClass) children.push(normaliseNode(node.superClass));
-  children.push(normaliseNode(node.body));
+  if (node.superClass) children.push(normaliseNode(node.superClass, context));
+  children.push(normaliseNode(node.body, context));
   return { type: node.type, children };
 }
 
-function normClassBody(node) {
-  return normNodeList('ClassBody', node.body);
+function normClassBody(node, context) {
+  return normNodeList('ClassBody', node.body, context);
 }
 
-function normMethod(node) {
+function normMethod(node, context) {
   const children = [
-    ...node.params.map(normaliseNode),
-    normaliseNode(node.body),
+    ...node.params.map((param) => normaliseNode(param, context)),
+    normaliseNode(node.body, context),
   ];
   return { type: node.type, children };
 }
 
-function normClassProperty(node) {
+function normClassProperty(node, context) {
   return {
     type: node.type,
-    children: node.value ? [normaliseNode(node.value)] : [],
+    children: node.value ? [normaliseNode(node.value, context)] : [],
   };
 }
 
-function normIf(node) {
-  const children = [normaliseNode(node.test), normaliseNode(node.consequent)];
-  if (node.alternate) children.push(normaliseNode(node.alternate));
+function normIf(node, context) {
+  const children = [normaliseNode(node.test, context), normaliseNode(node.consequent, context)];
+  if (node.alternate) children.push(normaliseNode(node.alternate, context));
   return { type: 'IfStatement', children };
 }
 
-function normFor(node) {
+function normFor(node, context) {
   const children = [];
-  if (node.init) children.push(normaliseNode(node.init));
-  if (node.test) children.push(normaliseNode(node.test));
-  if (node.update) children.push(normaliseNode(node.update));
-  children.push(normaliseNode(node.body));
+  if (node.init) children.push(normaliseNode(node.init, context));
+  if (node.test) children.push(normaliseNode(node.test, context));
+  if (node.update) children.push(normaliseNode(node.update, context));
+  children.push(normaliseNode(node.body, context));
   return { type: 'ForStatement', children };
 }
 
-function normSwitch(node) {
+function normSwitch(node, context) {
   return {
     type: 'SwitchStatement',
-    children: [normaliseNode(node.discriminant), ...node.cases.map(normaliseNode)],
+    children: [normaliseNode(node.discriminant, context), ...node.cases.map((item) => normaliseNode(item, context))],
   };
 }
 
-function normSwitchCase(node) {
-  const children = node.test ? [normaliseNode(node.test)] : [];
-  children.push(...node.consequent.map(normaliseNode));
+function normSwitchCase(node, context) {
+  const children = node.test ? [normaliseNode(node.test, context)] : [];
+  children.push(...node.consequent.map((child) => normaliseNode(child, context)));
   return { type: 'SwitchCase', children };
 }
 
-function normTry(node) {
-  const children = [normaliseNode(node.block)];
-  if (node.handler) children.push(normaliseNode(node.handler));
-  if (node.finalizer) children.push(normaliseNode(node.finalizer));
+function normTry(node, context) {
+  const children = [normaliseNode(node.block, context)];
+  if (node.handler) children.push(normaliseNode(node.handler, context));
+  if (node.finalizer) children.push(normaliseNode(node.finalizer, context));
   return { type: 'TryStatement', children };
 }
 
-function normCall(node) {
-  // Preserve callee shape (head position) + arguments
-  const children = [
-    normaliseNode(node.callee),
-    ...node.arguments.map(normaliseNode),
-  ];
+function normCall(node, context) {
+  const children = [normaliseNode(node.callee, context), ...node.arguments.map((arg) => normaliseNode(arg, context))];
   return { type: node.type, children };
 }
 
-function normMember(node) {
+function normMember(node, context) {
   return {
     type: 'MemberExpression',
-    children: [normaliseNode(node.object)],
+    children: [normaliseNode(node.object, context)],
   };
 }
 
-function normArray(node) {
-  return normNodeList('ArrayExpression', node.elements.filter(Boolean));
+function normArray(node, context) {
+  return normNodeList('ArrayExpression', node.elements.filter(Boolean), context);
 }
 
-function normObject(node) {
-  return normNodeList('ObjectExpression', node.properties);
+function normObject(node, context) {
+  return normNodeList('ObjectExpression', node.properties, context);
 }
 
-function normObjectProperty(node) {
+function normObjectProperty(node, context) {
   return {
     type: 'ObjectProperty',
-    children: [normaliseNode(node.value)],
+    children: [normaliseNode(node.value, context)],
   };
 }
 
-function normJSXElement(node) {
-  return normNodeList('JSXElement', node.children);
+function normJSXElement(node, context) {
+  return normNodeList('JSXElement', node.children, context);
 }
