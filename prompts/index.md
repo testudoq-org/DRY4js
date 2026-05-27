@@ -84,7 +84,7 @@ Provide concrete code examples for improved normalizeFunction() or equivalent, i
 
 #### Prompt 9.4 – Threshold Tuning + Validation Strategy
 
-**Status**: Pending
+**Status**: Completed — added built-in `--validate` runner, validation corpus, precision/recall summary, and optional adaptive threshold support.
 
 ```
 Help improve duplication detection reliability in DRY4js.

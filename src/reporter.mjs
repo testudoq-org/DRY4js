@@ -15,10 +15,11 @@ export function formatText(pairs) {
 
   return pairs
     .map((pair) => {
+      const confidence = pair.score.toFixed(2);
       const score = pair.score.toFixed(2);
       const left = `${pair.left.file}:${pair.left.startLine}-${pair.left.endLine}`;
       const right = `${pair.right.file}:${pair.right.startLine}-${pair.right.endLine}`;
-      return `DUPLICATE score=${score}\n  ${left}\n  ${right}`;
+      return `DUPLICATE confidence=${confidence} score=${score}\n  ${left}\n  ${right}`;
     })
     .join('\n\n');
 }
@@ -32,6 +33,7 @@ export function formatText(pairs) {
 export function formatJson(pairs) {
   const candidates = pairs.map((pair) => ({
     score: pair.score,
+    confidence: pair.score,
     left: {
       file: pair.left.file,
       startLine: pair.left.startLine,

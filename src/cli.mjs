@@ -12,6 +12,7 @@ import { normalise } from './normaliser.mjs';
 import { fingerprint, countNodes } from './fingerprinter.mjs';
 import { findDuplicates } from './comparator.mjs';
 import { report } from './reporter.mjs';
+import { validateDetection, formatValidationSummary } from './validator.mjs';
 
 export const DEFAULT_THRESHOLD = 0.82;
 export const DEFAULT_MIN_LINES = 4;
@@ -72,6 +73,25 @@ function buildResult({ files, entries, pairs, format, failOnDuplicates, spinner 
 
   spinner.succeed(`Done — ${pairs.length} duplicate pair(s) found.`);
   return { exitCode, files, entries, pairs, format };
+}
+
+function executeValidation(opts) {
+  const summary = validateDetection({
+    metric: opts.similarityMetric,
+    threshold: typeof opts.threshold === 'number' ? opts.threshold : undefined,
+    combinedWeight: opts.similarityWeight,
+    fastFilterThreshold: typeof opts.fastFilterThreshold === 'number' ? opts.fastFilterThreshold : undefined,
+    adaptiveThreshold: Boolean(opts.adaptiveThreshold),
+  });
+
+  if (opts.json) {
+    globalThis.console.log(JSON.stringify(summary, null, 2));
+  } else {
+    globalThis.console.log(formatValidationSummary(summary));
+  }
+
+  const exitCode = summary.falsePositives > 0 || summary.falseNegatives > 0 ? 1 : 0;
+  return { exitCode, files: [], entries: [], pairs: [], format: opts.json ? 'json' : 'text', validation: summary };
 }
 
 async function executeScan(paths, opts, spinnerFactory, reporter) {
@@ -140,9 +160,16 @@ export function buildProgram({ spinnerFactory = (options) => ora(options), repor
     .option('--exclude <pattern>', 'Glob pattern to exclude from scanning', collect, [])
     .option('--ignore-file <path>', 'Path to an ignore file', '.dry4jsignore')
     .option('--fail-on-duplicates', 'Exit with status 1 when duplicates are found')
-    .option('-f, --format <fmt>', 'Output format: text or json', 'text')
-    .option('--json', 'Shorthand for --format json')
-    .action(async (paths, opts) => {
+  .option('--adaptive-threshold', 'Apply adaptive threshold based on candidate complexity')
+  .option('--validate', 'Run built-in validation corpus and print precision/recall')
+  .option('-f, --format <fmt>', 'Output format: text or json', 'text')
+  .option('--json', 'Shorthand for --format json')
+  .action(async (paths, opts) => {
+      if (opts.validate) {
+        result = executeValidation(opts);
+        return result;
+      }
+
       result = await executeScan(paths, opts, spinnerFactory, reporter);
       return result;
     });

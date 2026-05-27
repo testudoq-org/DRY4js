@@ -17,6 +17,7 @@
  * Normalise a Babel AST node into a NormNode.
  *
  * @param {import('@babel/types').Node|null|undefined} node
+ * @param {{ semantic?: boolean, stableSymbols?: boolean }} [options]
  * @returns {NormNode}
  */
 export function normalise(node, options = {}) {
@@ -35,9 +36,10 @@ export function serialise(normNode) {
   return JSON.stringify(normNode);
 }
 
-function createNormaliserContext({ semantic = false } = {}) {
+function createNormaliserContext({ semantic = false, stableSymbols = false } = {}) {
   return {
     semantic,
+    stableSymbols,
     symbolMap: new Map(),
     nextSymbolId: 0,
   };
@@ -48,7 +50,10 @@ function createNormaliserContext({ semantic = false } = {}) {
 // ---------------------------------------------------------------------------
 
 const literalNode = (node, context) => formatLiteral(node, context);
-const symbolNode = (node, context) => ({ type: mapSymbol(node, context), children: [] });
+const symbolNode = (node, context) => ({
+  type: context.stableSymbols ? mapSymbol(node, context) : ':symbol',
+  children: [],
+});
 const emptyNode = (type) => ({ type, children: [] });
 
 const NORMALISERS = {
@@ -66,53 +71,53 @@ const NORMALISERS = {
   ClassProperty: normClassProperty,
   ClassPrivateProperty: normClassProperty,
   BlockStatement: normBlock,
-  ReturnStatement: (node) => normUnary('ReturnStatement', node.argument),
-  ExpressionStatement: (node) => normUnary('ExpressionStatement', node.expression),
+  ReturnStatement: (node, context) => normUnary('ReturnStatement', node.argument, context),
+  ExpressionStatement: (node, context) => normUnary('ExpressionStatement', node.expression, context),
   IfStatement: normIf,
-  WhileStatement: (node) => normBinary('WhileStatement', node.test, node.body),
-  DoWhileStatement: (node) => normBinary('DoWhileStatement', node.body, node.test),
+  WhileStatement: (node, context) => normBinary('WhileStatement', node.test, node.body, context),
+  DoWhileStatement: (node, context) => normBinary('DoWhileStatement', node.body, node.test, context),
   ForStatement: normFor,
-  ForInStatement: (node) => normBinary('ForInStatement', node.left, node.body),
-  ForOfStatement: (node) => normBinary('ForOfStatement', node.left, node.body),
+  ForInStatement: (node, context) => normBinary('ForInStatement', node.left, node.body, context),
+  ForOfStatement: (node, context) => normBinary('ForOfStatement', node.left, node.body, context),
   SwitchStatement: normSwitch,
   SwitchCase: normSwitchCase,
   TryStatement: normTry,
-  CatchClause: (node) => normUnary('CatchClause', node.body),
-  ThrowStatement: (node) => normUnary('ThrowStatement', node.argument),
+  CatchClause: (node, context) => normUnary('CatchClause', node.body, context),
+  ThrowStatement: (node, context) => normUnary('ThrowStatement', node.argument, context),
   BreakStatement: () => emptyNode('BreakStatement'),
   ContinueStatement: () => emptyNode('ContinueStatement'),
-  LabeledStatement: (node) => normUnary('LabeledStatement', node.body),
+  LabeledStatement: (node, context) => normUnary('LabeledStatement', node.body, context),
   CallExpression: normCall,
   OptionalCallExpression: normCall,
-  NewExpression: (node) => normCall({ ...node, type: 'NewExpression' }),
-  AssignmentExpression: (node) => normBinaryExpr('AssignmentExpression', node.left, node.right),
-  BinaryExpression: (node) => normBinaryExpr('BinaryExpression', node.left, node.right),
-  LogicalExpression: (node) => normBinaryExpr('LogicalExpression', node.left, node.right),
-  UnaryExpression: (node) => normUnary('UnaryExpression', node.argument),
-  UpdateExpression: (node) => normUnary('UpdateExpression', node.argument),
+  NewExpression: (node, context) => normCall({ ...node, type: 'NewExpression' }, context),
+  AssignmentExpression: (node, context) => normBinaryExpr('AssignmentExpression', node.left, node.right, context),
+  BinaryExpression: (node, context) => normBinaryExpr('BinaryExpression', node.left, node.right, context),
+  LogicalExpression: (node, context) => normBinaryExpr('LogicalExpression', node.left, node.right, context),
+  UnaryExpression: (node, context) => normUnary('UnaryExpression', node.argument, context),
+  UpdateExpression: (node, context) => normUnary('UpdateExpression', node.argument, context),
   ConditionalExpression: normTernary,
   MemberExpression: normMember,
   OptionalMemberExpression: normMember,
   ArrayExpression: normArray,
   ObjectExpression: normObject,
   ObjectProperty: normObjectProperty,
-  SpreadElement: (node) => normUnary('SpreadElement', node.argument),
+  SpreadElement: (node, context) => normUnary('SpreadElement', node.argument, context),
   TemplateLiteral: literalNode,
-  TaggedTemplateExpression: (node) => normBinaryExpr('TaggedTemplateExpression', node.tag, node.quasi),
-  AwaitExpression: (node) => normUnary('AwaitExpression', node.argument),
-  YieldExpression: (node) => normUnary('YieldExpression', node.argument),
-  SequenceExpression: (node) => normChildren('SequenceExpression', node.expressions),
-  AssignmentPattern: (node) => normBinaryExpr('AssignmentPattern', node.left, node.right),
-  RestElement: (node) => normUnary('RestElement', node.argument),
-  ArrayPattern: (node) => normChildren('ArrayPattern', node.elements.filter(Boolean)),
-  ObjectPattern: (node) => normChildren('ObjectPattern', node.properties),
+  TaggedTemplateExpression: (node, context) => normBinaryExpr('TaggedTemplateExpression', node.tag, node.quasi, context),
+  AwaitExpression: (node, context) => normUnary('AwaitExpression', node.argument, context),
+  YieldExpression: (node, context) => normUnary('YieldExpression', node.argument, context),
+  SequenceExpression: (node, context) => normChildren('SequenceExpression', node.expressions, context),
+  AssignmentPattern: (node, context) => normBinaryExpr('AssignmentPattern', node.left, node.right, context),
+  RestElement: (node, context) => normUnary('RestElement', node.argument, context),
+  ArrayPattern: (node, context) => normChildren('ArrayPattern', node.elements.filter(Boolean), context),
+  ObjectPattern: (node, context) => normChildren('ObjectPattern', node.properties, context),
   ImportDeclaration: () => emptyNode('ImportDeclaration'),
-  ExportNamedDeclaration: (node) => (
+  ExportNamedDeclaration: (node, context) => (
     node.declaration
-      ? normUnary('ExportNamedDeclaration', node.declaration)
+      ? normUnary('ExportNamedDeclaration', node.declaration, context)
       : emptyNode('ExportNamedDeclaration')
   ),
-  ExportDefaultDeclaration: (node) => normUnary('ExportDefaultDeclaration', node.declaration),
+  ExportDefaultDeclaration: (node, context) => normUnary('ExportDefaultDeclaration', node.declaration, context),
   ExportAllDeclaration: () => emptyNode('ExportAllDeclaration'),
   Identifier: symbolNode,
   PrivateName: symbolNode,
@@ -131,10 +136,10 @@ const NORMALISERS = {
   TSTypeAliasDeclaration: (node) => emptyNode(node.type),
   TSEnumDeclaration: (node) => emptyNode(node.type),
   JSXElement: normJSXElement,
-  JSXFragment: (node) => normChildren('JSXFragment', node.children),
-  JSXExpressionContainer: (node) => normUnary('JSXExpressionContainer', node.expression),
+  JSXFragment: (node, context) => normChildren('JSXFragment', node.children, context),
+  JSXExpressionContainer: (node, context) => normUnary('JSXExpressionContainer', node.expression, context),
   JSXText: literalNode,
-  JSXSpreadChild: (node) => normUnary('JSXSpreadChild', node.expression),
+  JSXSpreadChild: (node, context) => normUnary('JSXSpreadChild', node.expression, context),
 };
 
 /** @param {import('@babel/types').Node} node */

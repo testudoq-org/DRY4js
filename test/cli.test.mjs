@@ -182,7 +182,7 @@ describe('full pipeline reporter integration', () => {
     const fileA = writeTmp('reporter/a.js', src);
     const fileB = writeTmp(
       'reporter/b.js',
-      src.replace('workA', 'workB').replace('xs', 'items').replace('ys', 'filtered').replace('zs', 'mapped'),
+      src.replaceAll('workA', 'workB').replaceAll('xs', 'items').replaceAll('ys', 'filtered').replaceAll('zs', 'mapped'),
     );
 
     const { pairs } = runPipeline([fileA, fileB], { threshold: 0.5, minLines: 4, minNodes: 5 });
