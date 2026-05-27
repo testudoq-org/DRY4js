@@ -105,7 +105,7 @@ Provide:
 
 #### Prompt 9.5 – Overall Balanced Improvement Plan
 
-**Status**: Pending
+**Status**: Completed — implemented top high-impact changes including complementary similarity metrics, fast candidate filtering, adaptive thresholding, validation runner, and confidence reporting.
 
 ```
 Give me a minimal, high-impact improvement plan for DRY4js duplication detection.
