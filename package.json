@@ -1,6 +1,6 @@
 {
   "name": "dry-4-js",
-  "version": "0.5.0-alpha.5",
+  "version": "0.5.0-alpha.6",
   "description": "Structural duplicate detector for JavaScript/ES6 code",
   "type": "module",
   "main": "src/cli.mjs",

@@ -90,6 +90,17 @@ describe('normalise – identifiers and literals', () => {
     expect(norm.children).toEqual([]);
   });
 
+  it('stableSymbols mode preserves consistent numeric symbol identities', () => {
+    const norm = normalise({
+      type: 'BinaryExpression',
+      left: { type: 'Identifier', name: 'alpha' },
+      right: { type: 'Identifier', name: 'beta' },
+    }, { stableSymbols: true });
+
+    expect(norm.children[0].type).toBe(':symbol0');
+    expect(norm.children[1].type).toBe(':symbol1');
+  });
+
   it('string literals become :literal', () => {
     const norm = normalise({ type: 'StringLiteral', value: 'hello' });
     expect(norm.type).toBe(':literal');

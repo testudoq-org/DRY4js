@@ -120,6 +120,13 @@ function getSimilarityFunction(metric, combinedWeight) {
   }
 }
 
+function getAdaptiveThreshold(baseThreshold, left, right) {
+  const averageNodes = (left.nodeCount + right.nodeCount) / 2;
+  if (averageNodes < 30) return Math.min(baseThreshold + 0.10, 0.95);
+  if (averageNodes < 60) return Math.min(baseThreshold + 0.05, 0.90);
+  return baseThreshold;
+}
+
 /**
  * Find all pairs of entries whose normalised fingerprint sets are similar
  * enough to be flagged as duplicate candidates.
@@ -129,15 +136,16 @@ function getSimilarityFunction(metric, combinedWeight) {
  * @param {number} [options.threshold] - Minimum similarity score
  * @param {string} [options.metric='jaccard'] - Similarity metric to use
  * @param {number} [options.combinedWeight=0.5] - Weight used for combined score
+ * @param {boolean} [options.adaptiveThreshold=false] - Apply adaptive thresholds for smaller candidates
  * @returns {DuplicatePair[]}
  */
-export function findDuplicates(entries, { threshold, metric = 'jaccard', combinedWeight = 0.5, fastFilterThreshold = DEFAULT_FAST_FILTER_THRESHOLD, maxCandidates } = {}) {
+export function findDuplicates(entries, { threshold, metric = 'jaccard', combinedWeight = 0.5, fastFilterThreshold = DEFAULT_FAST_FILTER_THRESHOLD, adaptiveThreshold = false, maxCandidates } = {}) {
   if (!SUPPORTED_METRICS.has(metric)) {
     throw new Error(`Unsupported similarity metric: ${metric}`);
   }
 
   const scoreFn = getSimilarityFunction(metric, combinedWeight);
-  const effectiveThreshold = typeof threshold === 'number'
+  const baseThreshold = typeof threshold === 'number'
     ? threshold
     : metric === 'combined'
       ? DEFAULT_COMBINED_THRESHOLD
@@ -148,6 +156,10 @@ export function findDuplicates(entries, { threshold, metric = 'jaccard', combine
 
   for (const { left, right } of stageOnePairs) {
     const score = scoreFn(left.fingerprints, right.fingerprints);
+    const effectiveThreshold = adaptiveThreshold
+      ? getAdaptiveThreshold(baseThreshold, left, right)
+      : baseThreshold;
+
     if (score >= effectiveThreshold) {
       results.push({ score, left, right });
     }
